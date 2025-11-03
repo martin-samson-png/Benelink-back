@@ -7,6 +7,8 @@ import { sendEmail } from "../utils/sendEmail";
 import { passwordResetEmail } from "../email/resetPassword";
 import crypto from "node:crypto";
 import { requestResetPassword } from "../email/requestResetPassword";
+import { getRoleIdByName } from "../utils/roles.utils";
+import { Pool } from "mysql2/promise";
 
 type LoginInput = {
   email: string;
@@ -18,11 +20,10 @@ type LoginResponse = {
 };
 
 export class UserService {
-  private userRepository: UserRepository;
-
-  constructor(userRepository: UserRepository) {
-    this.userRepository = userRepository;
-  }
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly pool: Pool
+  ) {}
 
   async getUserById(id: string): Promise<Omit<User, "password">> {
     if (!id) {
@@ -37,9 +38,7 @@ export class UserService {
     return safeUser;
   }
 
-  async register(
-    user: Omit<User, "id" | "role">
-  ): Promise<Omit<User, "password">> {
+  async register(user: Omit<User, "id" | "role">) {
     if (!user.firstname || !user.lastname || !user.email || !user.password)
       throw new Error("Informations manquantes ou rôle invalide");
 
@@ -50,15 +49,20 @@ export class UserService {
       type: argon2.argon2id,
     });
 
-    const newUser = await this.userRepository.register({
-      ...user,
+    const userId = crypto.randomUUID();
+    const roleId = await getRoleIdByName(this.pool, "user");
+    if (!roleId) throw new Error("Role 'user' introuvable");
+
+    await this.userRepository.register({
+      id: userId,
+      firstname: user.firstname,
+      lastname: user.lastname,
+      email: user.email,
       password: hashedPassword,
+      role_id: roleId,
     });
 
-    const safeUser = cleanUser(newUser);
-    if (!safeUser) throw new Error("Erreur lors du nettoyage de l'utilisateur");
-
-    return safeUser;
+    return { ok: true };
   }
 
   async login({ email, password }: LoginInput): Promise<LoginResponse> {
@@ -145,5 +149,14 @@ export class UserService {
     });
 
     return { ok: true };
+  }
+
+  async deleteUserById(userId: string) {
+    if (!userId) throw new Error("Utilisateur non connecté");
+
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error("Utilisateur non trouvé");
+
+    return await this.userRepository.deleteUserById(userId);
   }
 }

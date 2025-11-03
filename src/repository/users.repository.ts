@@ -1,11 +1,21 @@
+import { Role } from "../models/role.model";
 import { User } from "../models/users.model";
-import { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import {
+  Pool,
+  PoolConnection,
+  ResultSetHeader,
+  RowDataPacket,
+} from "mysql2/promise";
 
 export class UserRepository {
-  private pool: Pool;
+  constructor(private readonly pool: Pool) {}
 
-  constructor(pool: Pool) {
-    this.pool = pool;
+  async getRoleIdByName(roleName: string): Promise<Role | null> {
+    const [rows] = await this.pool.query<RowDataPacket[] & Role[]>(
+      `SELECT id FROM roles WHERE name = ?`,
+      [roleName]
+    );
+    return rows[0] || null;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
@@ -20,13 +30,39 @@ export class UserRepository {
     }
   }
 
-  async getUserById(id: string): Promise<User | null> {
+  async getUserById(
+    id: string
+  ): Promise<Omit<
+    User,
+    "reset_token" | "reset_token_expiration" | "password"
+  > | null> {
     try {
-      const [rows] = await this.pool.query<RowDataPacket[] & User[]>(
-        `SELECT * FROM users WHERE id=?`,
+      const [rows] = await this.pool.query<any[]>(
+        `
+        SELECT u.id AS user_id, u.firstname, u.lastname, u.email, r.id AS role_id, r.name AS role_name
+        FROM users u
+        JOIN user_roles ur ON u.id = ur.user_id
+        JOIN roles r ON ur.role_id = r.id
+        WHERE u.id = ?`,
         [id]
       );
-      return rows[0] || null;
+      if (rows.length === 0) return null;
+
+      const user: Omit<
+        User,
+        "reset_token" | "reset_token_expiration" | "password"
+      > = {
+        id: rows[0].user_id,
+        firstname: rows[0].firstname,
+        lastname: rows[0].lastname,
+        email: rows[0].email,
+        roles: rows.map((row) => ({
+          id: row.role_id,
+          name: row.role_name,
+        })),
+      };
+
+      return user;
     } catch {
       throw new Error("Erreur lors de la récuperation de l'utilisateur");
     }
@@ -44,21 +80,38 @@ export class UserRepository {
     }
   }
 
-  async register(user: Omit<User, "id" | "role">): Promise<User> {
+  async register(
+    user: Omit<User, "role" | "reset_token_expiration" | "reset_token"> & {
+      role_id: number;
+    }
+  ) {
+    const connection: PoolConnection = await this.pool.getConnection();
     try {
-      const [result] = await this.pool.query<ResultSetHeader>(
-        `INSERT INTO users(firstname, lastname, email, password) VALUES (?, ?, ?, ?)`,
-        [user.firstname, user.lastname, user.email, user.password]
-      );
-      const userId = result.insertId;
-      const [rows] = await this.pool.query<RowDataPacket[] & User[]>(
-        `SELECT * FROM users WHERE id=?`,
-        [userId]
+      await connection.beginTransaction();
+      const [userResult] = await connection.query<ResultSetHeader>(
+        `INSERT INTO users(id, firstname, lastname, email, password) VALUES (?, ?, ?, ?, ?)`,
+        [user.id, user.firstname, user.lastname, user.email, user.password]
       );
 
-      return rows[0];
-    } catch {
-      throw new Error("Erreur lors de la création de l'utilisateur");
+      if (userResult.affectedRows === 0)
+        throw new Error("Echec de la création de l'utilisateur");
+
+      const [roleResult] = await connection.query<ResultSetHeader>(
+        `INSERT INTO user_roles(user_id, role_id) VALUES (? , ?)`,
+        [user.id, user.role_id]
+      );
+
+      if (roleResult.affectedRows === 0)
+        throw new Error("Echec de l'attribution du role");
+
+      await connection.commit();
+      return { ok: true };
+    } catch (err) {
+      if (connection) await connection.rollback();
+      console.error("Erreur transaction", err);
+      throw err;
+    } finally {
+      if (connection) connection.release();
     }
   }
 
@@ -91,6 +144,17 @@ export class UserRepository {
       return { ok: true };
     } catch {
       throw new Error("Erreur lors de l'insertion des données");
+    }
+  }
+
+  async deleteUserById(id: string) {
+    try {
+      await this.pool.query<ResultSetHeader>(`DELETE FROM users WHERE id=?`, [
+        id,
+      ]);
+      return { ok: true };
+    } catch {
+      throw new Error("Erreur lors de la suppression de l'utilisateur");
     }
   }
 }

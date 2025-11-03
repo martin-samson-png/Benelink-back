@@ -13,8 +13,8 @@ export const buildContainer = () => {
   const userRepository = new UserRepository(pool);
   const volunteersRepository = new VolunteersRepository(pool);
 
-  const userService = new UserService(userRepository);
-  const volunteersService = new VolunteersService(volunteersRepository);
+  const userService = new UserService(userRepository, pool);
+  const volunteersService = new VolunteersService(volunteersRepository, pool);
 
   const userController = new UserController(userService);
   const volunteersController = new VolunteersController(volunteersService);

@@ -1,11 +1,13 @@
 import { Volunteer } from "../models/volunteers.model";
-import { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import {
+  Pool,
+  ResultSetHeader,
+  RowDataPacket,
+  PoolConnection,
+} from "mysql2/promise";
 
 export class VolunteersRepository {
-  private pool: Pool;
-  constructor(pool: Pool) {
-    this.pool = pool;
-  }
+  constructor(private readonly pool: Pool) {}
 
   async getVolunteerByUserId(userId: string): Promise<Volunteer | null> {
     try {
@@ -27,22 +29,51 @@ export class VolunteersRepository {
   async createVolunteer(
     data: Omit<
       Volunteer,
-      "id" | "experience" | "createdAt" | "updatedAt" | "rate"
-    >
-  ): Promise<Volunteer> {
+      "experience" | "createdAt" | "updatedAt" | "rate" | "skills"
+    > & { role_id: number; skills_id: number[] | null }
+  ) {
+    const connection: PoolConnection = await this.pool.getConnection();
+
     try {
-      const [result] = await this.pool.query<ResultSetHeader>(
-        `INSERT INTO volunteers(user_id, city, skills) VALUES (?, ?, ?)`,
-        [data.userId, data.city, JSON.stringify(data.skills)]
+      await connection.beginTransaction();
+
+      console.log(data);
+
+      const [volunteerResult] = await connection.query<ResultSetHeader>(
+        `INSERT INTO volunteers(id, user_id, city) VALUES (?, ?, ?)`,
+        [data.id, data.userId, data.city]
       );
-      const userId = result.insertId;
-      const [rows] = await this.pool.query<RowDataPacket[] & Volunteer[]>(
-        `SELECT * FROM volunteers v WHERE user_id=?`,
-        [userId]
+      if (volunteerResult.affectedRows === 0)
+        throw new Error("Echec de la création du bénévole");
+
+      const [roleResult] = await connection.query<ResultSetHeader>(
+        `INSERT INTO user_roles(user_id, role_id) VALUES (?, ?)`,
+        [data.userId, data.role_id]
       );
+      if (roleResult.affectedRows === 0)
+        throw new Error("Echec de l'affectation du role");
+
+      for (const skill_id of data.skills_id!) {
+        const [skillsResult] = await connection.query<ResultSetHeader>(
+          `INSERT INTO volunteer_skills(volunteer_id, skills_id) VALUES (?, ?)`,
+          [data.id, skill_id]
+        );
+        if (skillsResult.affectedRows === 0)
+          throw new Error("Echec de l'affectation des skills");
+      }
+
+      const [rows] = await connection.query<RowDataPacket[] & Volunteer[]>(
+        "SELECT * FROM volunteers WHERE id=?",
+        [data.id]
+      );
+      await connection.commit();
       return rows[0];
-    } catch {
-      throw new Error("Erreur lors de la création du bénévole");
+    } catch (err) {
+      if (connection) await connection.rollback();
+      console.error("Erreur transaction", err);
+      throw err;
+    } finally {
+      if (connection) connection.release();
     }
   }
 }

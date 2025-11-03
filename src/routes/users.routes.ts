@@ -16,6 +16,9 @@ export const userRoutes = (userController: UserController): Router => {
   router.put("/request-reset", (req, res) =>
     userController.saveResetToken(req, res)
   );
+  router.delete("/", checkAuth, (req, res) =>
+    userController.deleteUserById(req, res)
+  );
 
   return router;
 };
