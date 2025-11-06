@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
-import { UserService } from "../users/users.service";
+import { UsersService } from "../users/users.service";
 import { AuthRepository } from "./auth.repository";
 import { RolesService } from "../roles/roles.services";
 import { User } from "./../../models/users.model";
@@ -19,7 +19,7 @@ import { LoginDTO, LoginResponseDTO } from "./dto/login.dto";
 export class AuthService {
   constructor(
     private readonly authRepository: AuthRepository,
-    private readonly usersService: UserService,
+    private readonly usersService: UsersService,
     private readonly rolesService: RolesService
   ) {}
 
@@ -35,14 +35,14 @@ export class AuthService {
     return cleanUser(user);
   }
 
-  async register(user: RegisterDTO) {
-    if (!user.firstname || !user.lastname || !user.email || !user.password)
+  async register(data: RegisterDTO) {
+    if (!data.firstname || !data.lastname || !data.email || !data.password)
       throw new ArgumentRequiredException("Informations manquantes");
 
-    const isEmailExist = await this.usersService.findByEmail(user.email);
+    const isEmailExist = await this.usersService.findByEmail(data.email);
     if (isEmailExist) throw new DataAlreadyExistException("Email existant");
 
-    const hashedPassword = await argon2.hash(user.password, {
+    const hashedPassword = await argon2.hash(data.password, {
       type: argon2.argon2id,
     });
 
@@ -52,9 +52,9 @@ export class AuthService {
 
     await this.authRepository.register({
       id: userId,
-      firstname: user.firstname,
-      lastname: user.lastname,
-      email: user.email,
+      firstname: data.firstname,
+      lastname: data.lastname,
+      email: data.email,
       password: hashedPassword,
       roleId: roleId,
     });

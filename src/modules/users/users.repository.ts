@@ -2,6 +2,7 @@ import { User } from "../../models/users.model";
 import { Pool, ResultSetHeader } from "mysql2/promise";
 import { CreateUserDTO } from "./dto/create-user.dto";
 import { InternalServerException } from "../../exceptions/internal.server.exception";
+import { UpdateUserDTO } from "./dto/update-user.dto";
 
 export class UsersRepository {
   constructor(private readonly pool: Pool) {}
@@ -30,7 +31,7 @@ export class UsersRepository {
     try {
       await connection.beginTransaction();
       const [userResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO user(id, firstname, lastname, email, password) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO users(id, firstname, lastname, email, password) VALUES (?, ?, ?, ?, ?)`,
         [data.id, data.firstname, data.lastname, data.email, data.password]
       );
       if (userResult.affectedRows === 0)
@@ -39,7 +40,7 @@ export class UsersRepository {
         );
 
       const [roleResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO user_roles(user_id, roleId) VALUES (? , ?)`,
+        `INSERT INTO user_roles(user_id, role_id) VALUES (? , ?)`,
         [data.id, data.roleId]
       );
       if (roleResult.affectedRows === 0)
@@ -47,17 +48,36 @@ export class UsersRepository {
 
       await connection.commit();
       return { ok: true };
+    } catch (err) {
+      if (connection) await connection.rollback();
+      console.error("Erreur transaction", err);
+      throw err;
+    } finally {
+      if (connection) connection.release();
+    }
+  }
+
+  async updateUser(data: Omit<UpdateUserDTO, "oldPassword">, userId: string) {
+    try {
+      const key = Object.keys(data);
+      const values = Object.values(data);
+      const setkey = key.map((k) => `${k} = ?`).join(", ");
+      await this.pool.query<ResultSetHeader>(
+        `UPDATE users SET ${setkey} WHERE id=?`,
+        [...values, userId]
+      );
+      return { ok: true };
     } catch {
       throw new InternalServerException(
-        "Erreur lors de la création de l'utilisateur"
+        "Erreur lors de la modification de l'utilisateur"
       );
     }
   }
 
-  async deleteUserById(id: string) {
+  async deleteUserById(userId: string) {
     try {
       await this.pool.query<ResultSetHeader>(`DELETE FROM users WHERE id=?`, [
-        id,
+        userId,
       ]);
       return { ok: true };
     } catch {

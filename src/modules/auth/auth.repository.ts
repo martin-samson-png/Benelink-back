@@ -21,7 +21,7 @@ export class AuthRepository {
         );
 
       const [roleResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO user_roles(user_id, roleId) VALUES (? , ?)`,
+        `INSERT INTO user_roles(user_id, role_id) VALUES (? , ?)`,
         [data.id, data.roleId]
       );
 

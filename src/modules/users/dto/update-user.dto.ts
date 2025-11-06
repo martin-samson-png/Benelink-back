@@ -3,5 +3,5 @@ export interface UpdateUserDTO {
   lastname?: string;
   email?: string;
   password?: string;
-  oldPassword?: string;
+  oldPassword: string;
 }

@@ -7,13 +7,13 @@ import { AssociationsRepository } from "../modules/associations/associations.rep
 import { RolesRepository } from "../modules/roles/roles.repository";
 import { SkillsRepository } from "../modules/skills/skills.repository";
 import { AuthService } from "../modules/auth/auth.service";
-import { UserService } from "../modules/users/users.service";
+import { UsersService } from "../modules/users/users.service";
 import { VolunteersService } from "../modules/volunteers/volunteers.service";
 import { AssociationsService } from "../modules/associations/associations.service";
 import { RolesService } from "../modules/roles/roles.services";
 import { SkillsService } from "../modules/skills/skills.service";
 import { AuthController } from "../modules/auth/auth.controller";
-import { UserController } from "../modules/users/users.controller";
+import { UsersController } from "../modules/users/users.controller";
 import { VolunteersController } from "../modules/volunteers/volunteers.controller";
 import { AssociationsController } from "../modules/associations/associations.controller";
 
@@ -29,7 +29,7 @@ export const buildContainer = () => {
 
   const rolesService = new RolesService(rolesRepository);
   const skillsService = new SkillsService(skillsRepository);
-  const userService = new UserService(usersRepository);
+  const userService = new UsersService(usersRepository, rolesService);
   const authService = new AuthService(
     authRepository,
     userService,
@@ -47,7 +47,7 @@ export const buildContainer = () => {
   );
 
   const authController = new AuthController(authService);
-  const userController = new UserController(userService);
+  const userController = new UsersController(userService);
   const volunteersController = new VolunteersController(volunteersService);
   const assoicaitonsController = new AssociationsController(
     associationsService
