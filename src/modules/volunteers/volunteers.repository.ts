@@ -1,4 +1,4 @@
-import { Volunteer } from "../models/volunteers.model";
+import { Volunteer } from "../../models/volunteers.model";
 import {
   Pool,
   ResultSetHeader,

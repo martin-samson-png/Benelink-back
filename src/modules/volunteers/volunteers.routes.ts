@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { VolunteersController } from "../controllers/volunteers.controller";
-import { checkAuth } from "../middlewares/checkAuth";
+import { VolunteersController } from "./volunteers.controller";
+import { checkAuth } from "../../middlewares/checkAuth";
 
 export const volunteersRoutes = (
   volunteersController: VolunteersController

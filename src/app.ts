@@ -2,9 +2,12 @@ import dotenv from "dotenv";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import { userRoutes } from "./routes/users.routes";
+import { userRoutes } from "./modules/users/users.routes";
 import { buildContainer } from "./utils/buildContainer";
-import { volunteersRoutes } from "./routes/volunteers.routes";
+import { volunteersRoutes } from "./modules/volunteers/volunteers.routes";
+import { AssociationsRouter } from "./modules/associations/associations.routes";
+import { authRoutes } from "./modules/auth/auth.routes";
+import { handleError } from "./middlewares/handleError";
 
 dotenv.config();
 const app = express();
@@ -17,8 +20,14 @@ app.use(cookieParser());
 const container = buildContainer();
 const userController = container.userController;
 const volunteersController = container.volunteersController;
+const associationsController = container.assoicaitonsController;
+const authController = container.authController;
 
+app.use("/auth", authRoutes(authController));
 app.use("/users", userRoutes(userController));
 app.use("/volunteers", volunteersRoutes(volunteersController));
+app.use("/associations", AssociationsRouter(associationsController));
+
+app.use(handleError);
 
 app.listen(PORT, () => console.log("Locahost connected", PORT));

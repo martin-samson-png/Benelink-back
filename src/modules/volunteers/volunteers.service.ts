@@ -1,14 +1,14 @@
-import { Pool } from "mysql2/promise";
-import { Volunteer } from "../models/volunteers.model";
-import { VolunteersRepository } from "./../repository/volunteers.repository";
 import crypto from "node:crypto";
-import { getRoleIdByName } from "../utils/roles.utils";
-import { getSkillIdByName } from "../utils/skills.utils";
+import { Volunteer } from "../../models/volunteers.model";
+import { VolunteersRepository } from "./volunteers.repository";
+import { RolesService } from "../roles/roles.services";
+import { SkillsService } from "../skills/skills.service";
 
 export class VolunteersService {
   constructor(
     private readonly volunteersRepository: VolunteersRepository,
-    private readonly pool: Pool
+    private readonly rolesService: RolesService,
+    private readonly skillsService: SkillsService
   ) {}
 
   async createVolunteer(
@@ -25,7 +25,7 @@ export class VolunteersService {
     if (isVolunteerExisting) throw new Error("Bénévoles déjà existant");
 
     const volunteerId = crypto.randomUUID();
-    const roleId = await getRoleIdByName(this.pool, "volunteer");
+    const roleId = await this.rolesService.getRoleIdByName("volunteer");
     if (!roleId) throw new Error("Role 'volunteer' introuvable");
 
     const arrSkillsId = await Promise.all(
@@ -37,7 +37,7 @@ export class VolunteersService {
             )}). Une chaîne de caractères est attendue.`
           );
 
-        const skillId = await getSkillIdByName(this.pool, skill);
+        const skillId = await this.skillsService.getSkillIdByName(skill);
 
         if (!skillId) throw new Error(`Skill "${skill}" introuvable`);
 
