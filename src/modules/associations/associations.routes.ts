@@ -7,11 +7,24 @@ export const AssociationsRouter = (
 ): Router => {
   const router = Router();
 
-  router.post("/", checkAuth, (req, res) =>
-    associationsController.createAssociation(req, res)
+  router.get("/", (req, res, next) =>
+    associationsController.getAllAssociations(req, res, next)
   );
-  router.post("/invitation", checkAuth, (req, res) =>
-    associationsController.createInvitation(req, res)
+
+  router.get("/:id", (req, res, next) =>
+    associationsController.getAssociationById(req, res, next)
+  );
+
+  router.post("/", checkAuth, (req, res, next) =>
+    associationsController.createAssociation(req, res, next)
+  );
+
+  router.patch("/:id", checkAuth, (req, res, next) =>
+    associationsController.updateAssociation(req, res, next)
+  );
+
+  router.delete("/:id", checkAuth, (req, res, next) =>
+    associationsController.deleteAssociation(req, res, next)
   );
 
   return router;

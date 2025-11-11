@@ -39,8 +39,6 @@ export class VolunteersService {
       throw new DataAlreadyExistException("Bénévole déjà existant");
 
     const roleId = await this.rolesService.getRoleIdByName("volunteer");
-    if (!roleId)
-      throw new DataNotFoundException("Rôle 'volunteer' introuvable");
 
     if (
       !Array.isArray(skills) ||
@@ -76,12 +74,7 @@ export class VolunteersService {
       roleId,
     });
 
-    return {
-      message: "Bénévole créé avec succès",
-      volunteerId,
-      city,
-      skills: skillsNames,
-    };
+    return await this.getVolunteerById(volunteerId);
   }
 
   async updateVolunteer(city: string, skills: string[], userId: string) {

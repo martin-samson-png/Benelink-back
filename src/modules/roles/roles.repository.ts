@@ -1,4 +1,4 @@
-import { Pool, RowDataPacket } from "mysql2/promise";
+import { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 export class RolesRepository {
   constructor(private readonly pool: Pool) {}
@@ -15,5 +15,15 @@ export class RolesRepository {
     } catch {
       throw new Error("Erreur lors de la récuperation des rôles");
     }
+  }
+
+  async deleteUserRoleByName(userId: string, roleName: string) {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `DELETE ur FROM user_roles ur
+     JOIN roles r ON ur.role_id = r.id
+     WHERE ur.user_id = ? AND r.name = ?`,
+      [userId, roleName]
+    );
+    return result;
   }
 }

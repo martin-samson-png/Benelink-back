@@ -2,96 +2,132 @@ import crypto from "node:crypto";
 import { AssociationsRepository } from "./associations.repository";
 import { Association } from "../../models/association.model";
 import { verifyRNa } from "../../utils/verifyRna";
-import { invitationEmail } from "../email/invitation.email";
-import { sendEmail } from "../../utils/sendEmail";
+
 import { RolesService } from "../roles/roles.services";
-import { UserService } from "../users/users.service";
+import { UsersService } from "../users/users.service";
+import DataNotFoundException from "../../exceptions/data.not.found";
+import { CreateAssociationDTO } from "./dto/create-association";
+import DataAlreadyExistException from "../../exceptions/data.already.exists";
+import ArgumentRequiredException from "../../exceptions/argument.required";
+import { UpdateAssociationDTO } from "./dto/update-association";
+import ForbiddenException from "../../exceptions/forbidden";
+import { InternalServerException } from "../../exceptions/internal.server.exception";
 
 export class AssociationsService {
   constructor(
-    private readonly associationsRepo: AssociationsRepository,
+    private readonly associationsRepository: AssociationsRepository,
     private readonly rolesService: RolesService,
-    private readonly usersService: UserService
+    private readonly usersService: UsersService
   ) {}
 
-  async createAssociation(
-    data: Omit<
-      Association,
-      "id" | "verified" | "created_at" | "updated_at" | "rate"
-    >
-  ) {
-    if (
-      !data.userId ||
-      !data.asso_name ||
-      !data.rna ||
-      !data.city ||
-      !data.contact_email
-    )
-      throw new Error("Champs obligatoire manquant");
+  async getAssociationById(assoId: string): Promise<Association> {
+    const association = await this.associationsRepository.getAssociationById(
+      assoId
+    );
+    if (!association)
+      throw new DataNotFoundException("Aucune association trouvé");
+
+    return association;
+  }
+
+  async getAllAssociations(): Promise<Association[] | []> {
+    return await this.associationsRepository.getAllAssociations();
+  }
+
+  async createAssociation(data: CreateAssociationDTO) {
+    if (!data.asso_name || !data.rna || !data.city || !data.contact_email)
+      throw new ArgumentRequiredException("Champs obligatoire manquant");
+
+    const user = await this.usersService.findById(data.userId);
+    if (!user) throw new DataNotFoundException("Utilisateur introuvable");
+
+    const isRnaUsed = await this.associationsRepository.getAssociationByRNA(
+      data.rna
+    );
+    if (isRnaUsed)
+      throw new DataAlreadyExistException("Numéro RNA déjà utilisé");
 
     const checkRNA = await verifyRNa(data.rna);
-    if (!checkRNA.verified) throw new Error("Numéro RNA invalide");
+    if (!checkRNA.verified)
+      throw new ArgumentRequiredException("Numéro RNA invalide");
 
     const asso_id = crypto.randomUUID();
     const role_id = await this.rolesService.getRoleIdByName("asso_member");
-    if (!role_id) throw new Error("Role 'asso_member' introuvable");
 
-    await this.associationsRepo.createAssociation({
+    await this.associationsRepository.createAssociation({
       id: asso_id,
-      userId: data.userId,
-      asso_name: data.asso_name,
-      rna: data.rna,
-      descr: data.descr,
-      website_url: data.website_url,
-      social_link: data.social_link,
-      city: data.city,
-      contact_email: data.contact_email,
       role_id,
+      ...data,
     });
 
-    return { ok: true };
+    return await this.getAssociationById(asso_id);
   }
 
-  async createInviation(email: string, associationId: string, userId: string) {
-    if (!email || !associationId || !userId)
-      throw new Error("Champs obligatoire manquant");
+  async updateAssociation(data: UpdateAssociationDTO & { userId: string }) {
+    if (!data.id) throw new ArgumentRequiredException("Id manquante");
+    if (!Object.keys(data).length)
+      throw new ArgumentRequiredException("Aucune donnée à mettre à jour");
 
-    const user = await this.usersService.findById(userId);
-    if (!user) throw new Error("Utilisateur inexistant");
+    const association = await this.getAssociationById(data.id);
+    if (!association)
+      throw new DataNotFoundException("Association introuvable");
 
-    const association = await this.associationsRepo.getAssociationById(
+    const member = await this.associationsRepository.findMemberInAssociation(
+      data.userId,
+      data.id
+    );
+    if (!member)
+      throw new ForbiddenException(
+        "Accès refusé :  Vous ne faites pas partis de l'association"
+      );
+    if (!["owner", "admin"].includes(member.role))
+      throw new ForbiddenException(
+        "Vous n'avez pas les droits pour modifier cette association"
+      );
+    const { userId, ...fields } = data;
+
+    const result = await this.associationsRepository.updateAssociation(fields);
+    if (result.affectedRows === 0)
+      throw new DataNotFoundException("Association introuvable ou inchangée");
+
+    return await this.getAssociationById(data.id);
+  }
+
+  async deleteAssociation(userId: string, associationId: string) {
+    if (!associationId) throw new ArgumentRequiredException("Id manquante");
+
+    const role = await this.associationsRepository.findMemberInAssociation(
+      userId,
       associationId
     );
-    if (!association) {
-      throw new Error("Associations inexistante");
+    if (!role)
+      throw new ForbiddenException(
+        "Accès refusé :  Vous ne faites pas partis de l'association"
+      );
+    if (!["owner"].includes(role.role))
+      throw new ForbiddenException(
+        "Vous n'avez pas les droits pour modifier cette association"
+      );
+
+    const members = await this.associationsRepository.getMembersByAssociation(
+      associationId
+    );
+
+    const result = await this.associationsRepository.deleteAssociation(
+      associationId
+    );
+    if (result.affectedRows === 0)
+      throw new InternalServerException("Association introuvable");
+
+    for (const member of members) {
+      const count = await this.associationsRepository.countAssociationsByUser(
+        member.user_id
+      );
+      if (count === 0)
+        await this.rolesService.deleteUserRoleByName(
+          member.user_id,
+          "asso_member"
+        );
     }
-
-    const token = crypto.randomBytes(32).toString("hex");
-
-    const invitation_link = `${process.env.FRONT_URL}/invitation/accept?token=${token}`;
-
-    const user_name = `${user.firstname} ${user.lastname}`;
-
-    const { html, text } = invitationEmail({
-      asso_name: association.asso_name,
-      user_name,
-      invitation_link,
-    });
-
-    await sendEmail({
-      to: email,
-      subject: `Invitation à rejoindre l'association ${association.asso_name}`,
-      html,
-      text,
-      replyTo: process.env.OWNER_EMAIL,
-      tags: [{ name: "type", value: "association_invitation" }],
-    });
-
-    await this.associationsRepo.createInvitation({
-      token,
-      associationId,
-      created_by: userId,
-      email,
-    });
   }
 }

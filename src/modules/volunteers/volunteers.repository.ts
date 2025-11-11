@@ -160,14 +160,6 @@ export class VolunteersRepository {
           "Erreur lors de la suppression du bénévole"
         );
 
-      const [roleResult] = await connection.query<ResultSetHeader>(
-        `DELETE FROM user_roles WHERE user_id=? AND role_id=?`,
-        [userId, roleId]
-      );
-      if (roleResult.affectedRows === 0)
-        throw new InternalServerException(
-          "Erreur lors de la suppression du role"
-        );
       return { ok: true };
     } catch {
       throw new InternalServerException(
