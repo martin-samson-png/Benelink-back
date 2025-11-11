@@ -6,10 +6,10 @@ import { verifyRNa } from "../../utils/verifyRna";
 import { RolesService } from "../roles/roles.services";
 import { UsersService } from "../users/users.service";
 import DataNotFoundException from "../../exceptions/data.not.found";
-import { CreateAssociationDTO } from "./dto/create-association";
+import { CreateAssociationDTO } from "./dto/create-association.dto";
 import DataAlreadyExistException from "../../exceptions/data.already.exists";
 import ArgumentRequiredException from "../../exceptions/argument.required";
-import { UpdateAssociationDTO } from "./dto/update-association";
+import { UpdateAssociationDTO } from "./dto/update-association.dto";
 import ForbiddenException from "../../exceptions/forbidden";
 import { InternalServerException } from "../../exceptions/internal.server.exception";
 
@@ -65,7 +65,9 @@ export class AssociationsService {
 
   async updateAssociation(data: UpdateAssociationDTO & { userId: string }) {
     if (!data.id) throw new ArgumentRequiredException("Id manquante");
-    if (!Object.keys(data).length)
+
+    const { id, userId, ...fields } = data;
+    if (!Object.keys(fields).length)
       throw new ArgumentRequiredException("Aucune donnée à mettre à jour");
 
     const association = await this.getAssociationById(data.id);
@@ -84,9 +86,11 @@ export class AssociationsService {
       throw new ForbiddenException(
         "Vous n'avez pas les droits pour modifier cette association"
       );
-    const { userId, ...fields } = data;
 
-    const result = await this.associationsRepository.updateAssociation(fields);
+    const result = await this.associationsRepository.updateAssociation({
+      id,
+      ...fields,
+    });
     if (result.affectedRows === 0)
       throw new DataNotFoundException("Association introuvable ou inchangée");
 
@@ -106,7 +110,7 @@ export class AssociationsService {
       );
     if (!["owner"].includes(role.role))
       throw new ForbiddenException(
-        "Vous n'avez pas les droits pour modifier cette association"
+        "Vous n'avez pas les droits pour supprimer cette association"
       );
 
     const members = await this.associationsRepository.getMembersByAssociation(
@@ -119,15 +123,17 @@ export class AssociationsService {
     if (result.affectedRows === 0)
       throw new InternalServerException("Association introuvable");
 
-    for (const member of members) {
-      const count = await this.associationsRepository.countAssociationsByUser(
-        member.user_id
-      );
-      if (count === 0)
-        await this.rolesService.deleteUserRoleByName(
-          member.user_id,
-          "asso_member"
+    await Promise.all(
+      members.map(async (member) => {
+        const count = await this.associationsRepository.countAssociationsByUser(
+          member.user_id
         );
-    }
+        if (count === 0)
+          await this.rolesService.deleteUserRoleByName(
+            member.user_id,
+            "asso_member"
+          );
+      })
+    );
   }
 }

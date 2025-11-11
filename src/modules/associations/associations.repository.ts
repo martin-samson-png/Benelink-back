@@ -1,7 +1,7 @@
 import { Pool, ResultSetHeader, PoolConnection } from "mysql2/promise";
 import { Association } from "../../models/association.model";
-import { CreateAssociationDTO } from "./dto/create-association";
-import { UpdateAssociationDTO } from "./dto/update-association";
+import { CreateAssociationDTO } from "./dto/create-association.dto";
+import { UpdateAssociationDTO } from "./dto/update-association.dto";
 
 export class AssociationsRepository {
   constructor(private readonly pool: Pool) {}

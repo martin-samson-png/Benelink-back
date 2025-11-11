@@ -32,8 +32,10 @@ export class AssociationsController {
         userId,
         ...req.body,
       };
-      await this.associationsService.createAssociation(data);
-      res.status(201).json({ message: "Association créé" });
+      const association = await this.associationsService.createAssociation(
+        data
+      );
+      res.status(201).json(association);
     } catch (err) {
       next(err);
     }

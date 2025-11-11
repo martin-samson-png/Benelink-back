@@ -17,6 +17,8 @@ export const handleError = (
       return res.status(404).json({ status: 404, error: err.message });
     case "DataAlreadyExistException":
       return res.status(409).json({ status: 409, error: err.message });
+    case "TooManyRequestsException":
+      return res.status(429).json({ status: 429, error: err.message });
     case "InternalServerException":
       return res.status(500).json({
         status: 500,
