@@ -7,8 +7,28 @@ export const volunteersRoutes = (
 ): Router => {
   const router = Router();
 
-  router.post("/", checkAuth, (req, res) =>
-    volunteersController.createVolunteer(req, res)
+  router.post("/", checkAuth, (req, res, next) =>
+    volunteersController.createVolunteer(req, res, next)
+  );
+
+  router.get("/", (req, res, next) =>
+    volunteersController.getAllVolunteers(req, res, next)
+  );
+
+  router.get("/me", checkAuth, (req, res, next) =>
+    volunteersController.getVolunteerByUserId(req, res, next)
+  );
+
+  router.get("/:id", (req, res, next) =>
+    volunteersController.getVolunteerById(req, res, next)
+  );
+
+  router.put("/", checkAuth, (req, res, next) =>
+    volunteersController.updateVolunteer(req, res, next)
+  );
+
+  router.delete("/", checkAuth, (req, res, next) =>
+    volunteersController.deleteVolunteer(req, res, next)
   );
 
   return router;

@@ -32,7 +32,7 @@ export class AssociationsRepository {
       await connection.beginTransaction();
 
       const [assoResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO associations(id, userId, asso_name, rna, description, website_url, social_link, contact_email, city)
+        `INSERT INTO associations(id, user_id, asso_name, rna, description, website_url, social_link, contact_email, city)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
@@ -51,7 +51,7 @@ export class AssociationsRepository {
         throw new Error("Echec de la création de l'association");
 
       const [assoMemberResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO association_members(associationId, userId, role, joined_at) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO association_members(association_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`,
         [
           data.id,
           data.userId,
@@ -65,7 +65,7 @@ export class AssociationsRepository {
         );
 
       const [roleResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO user_roles(userId, role_id) VALUES (?, ?)`,
+        `INSERT INTO user_roles(user_id, role_id) VALUES (?, ?)`,
         [data.userId, data.role_id]
       );
       if (roleResult.affectedRows === 0)

@@ -6,6 +6,8 @@ import { UsersRepository } from "./users.repository";
 import { RolesService } from "../roles/roles.services";
 import DataNotFoundException from "./../../exceptions/data.not.found";
 import { UpdateUserDTO } from "./dto/update-user.dto";
+import { cleanUser } from "../../utils/users.utils";
+import { CleanUser } from "../../models/users.model";
 
 export class UsersService {
   constructor(
@@ -21,7 +23,7 @@ export class UsersService {
 
   async findById(id: string) {
     const user = await this.usersRepository.getUserById(id);
-    if (!user) throw new Error("Utilisateur introuvable");
+    if (!user) throw new DataNotFoundException("Utilisateur introuvable");
 
     return user;
   }
@@ -51,8 +53,23 @@ export class UsersService {
     });
   }
 
+  async getUserById(userId: string) {
+    if (!userId) throw new ArgumentRequiredException("Champs manquant");
+
+    const user = await this.findById(userId);
+    if (!user) throw new DataNotFoundException("Utilisateur introuvable");
+
+    return cleanUser(user);
+  }
+
+  async getAllUsers(): Promise<CleanUser[]> {
+    const users = await this.usersRepository.getAllUsers();
+
+    return users.map(cleanUser);
+  }
+
   async updateUser(data: UpdateUserDTO, userId: string) {
-    if (!userId || !data || Object.keys(data).length === 0)
+    if (!data || Object.keys(data).length === 0)
       throw new ArgumentRequiredException("Champs obligatoire manquant");
 
     if (!data.oldPassword)

@@ -22,8 +22,13 @@ export class UsersRepository {
       id,
     ]);
 
-    const users = rows as User[];
-    return users.length > 0 ? users[0] : null;
+    const user = rows as User[];
+    return user.length > 0 ? user[0] : null;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const [rows] = await this.pool.query(`SELECT * FROM users`);
+    return rows as User[];
   }
 
   async createUser(data: CreateUserDTO & { id: string; roleId: number }) {

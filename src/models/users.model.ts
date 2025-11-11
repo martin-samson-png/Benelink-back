@@ -10,3 +10,11 @@ export interface User {
   reset_token: string;
   reset_token_expiration: string;
 }
+
+export interface CleanUser {
+  id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  roles: Role[];
+}

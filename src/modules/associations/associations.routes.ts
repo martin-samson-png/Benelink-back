@@ -7,7 +7,7 @@ export const AssociationsRouter = (
 ): Router => {
   const router = Router();
 
-  router.post("/asso", checkAuth, (req, res) =>
+  router.post("/", checkAuth, (req, res) =>
     associationsController.createAssociation(req, res)
   );
   router.post("/invitation", checkAuth, (req, res) =>

@@ -1,8 +1,11 @@
 import crypto from "node:crypto";
-import { Volunteer } from "../../models/volunteers.model";
 import { VolunteersRepository } from "./volunteers.repository";
 import { RolesService } from "../roles/roles.services";
 import { SkillsService } from "../skills/skills.service";
+import { CreateVolunteerDTO } from "./dto/create-volunteer.dto";
+import DataNotFoundException from "../../exceptions/data.not.found";
+import ArgumentRequiredException from "../../exceptions/argument.required";
+import DataAlreadyExistException from "../../exceptions/data.already.exists";
 
 export class VolunteersService {
   constructor(
@@ -11,48 +14,131 @@ export class VolunteersService {
     private readonly skillsService: SkillsService
   ) {}
 
-  async createVolunteer(
-    data: Omit<
-      Volunteer,
-      "id" | "experience" | "createdAt" | "updatedAt" | "rate"
-    >
-  ) {
-    if (!data.city || !data.skills || !data.userId)
-      throw new Error("Champs obligatoire manquante");
+  async getVolunteerById(volunteerId: string) {
+    if (!volunteerId) throw new ArgumentRequiredException("Id manquante");
 
-    const isVolunteerExisting =
-      await this.volunteersRepository.getVolunteerByUserId(data.userId);
-    if (isVolunteerExisting) throw new Error("Bénévoles déjà existant");
+    return await this.volunteersRepository.getVolunteerById(volunteerId);
+  }
 
-    const volunteerId = crypto.randomUUID();
+  async getVolunteerByUserId(userId: string) {
+    return await this.volunteersRepository.getVolunteerByUserId(userId);
+  }
+
+  async getAllVolunteers() {
+    return await this.volunteersRepository.getAllVolunteers();
+  }
+
+  async createVolunteer(data: CreateVolunteerDTO) {
+    const { city, skills, userId } = data;
+
+    if (!city || !skills?.length || !userId)
+      throw new ArgumentRequiredException("Champs obligatoires manquants");
+
+    const existingVolunteer = await this.getVolunteerByUserId(userId);
+    if (existingVolunteer)
+      throw new DataAlreadyExistException("Bénévole déjà existant");
+
     const roleId = await this.rolesService.getRoleIdByName("volunteer");
-    if (!roleId) throw new Error("Role 'volunteer' introuvable");
+    if (!roleId)
+      throw new DataNotFoundException("Rôle 'volunteer' introuvable");
 
-    const arrSkillsId = await Promise.all(
-      data.skills.map(async (skill) => {
-        if (typeof skill !== "string")
-          throw new Error(
-            `Compétence invalide (${JSON.stringify(
-              skill
-            )}). Une chaîne de caractères est attendue.`
-          );
+    if (
+      !Array.isArray(skills) ||
+      skills.some((skill) => typeof skill !== "string")
+    )
+      throw new ArgumentRequiredException(
+        "Toutes les compétences doivent être des chaînes de caractères"
+      );
 
-        const skillId = await this.skillsService.getSkillIdByName(skill);
+    const skillRows = await this.skillsService.getSkillsIdByNames(skills);
 
-        if (!skillId) throw new Error(`Skill "${skill}" introuvable`);
+    if (!skillRows)
+      throw new DataNotFoundException("Aucune compétence valide trouvée");
 
-        return skillId;
-      })
+    const skillsNames = skillRows.map((row) => row.name);
+    const missingSkills = skills.filter(
+      (skill) => !skillsNames.includes(skill)
     );
 
+    if (missingSkills.length > 0)
+      throw new DataNotFoundException(
+        `Compétences introuvables : ${missingSkills.join(", ")}`
+      );
+
+    const skillsId = skillRows.map((row) => row.id);
+    const volunteerId = crypto.randomUUID();
+
     await this.volunteersRepository.createVolunteer({
-      id: volunteerId,
-      userId: data.userId,
-      city: data.city,
-      skills_id: arrSkillsId,
-      role_id: roleId,
+      volunteerId,
+      userId,
+      city,
+      skillsId,
+      roleId,
     });
 
-    return { ok: true };
+    return {
+      message: "Bénévole créé avec succès",
+      volunteerId,
+      city,
+      skills: skillsNames,
+    };
+  }
+
+  async updateVolunteer(city: string, skills: string[], userId: string) {
+    const volunteer = await this.getVolunteerByUserId(userId);
+    if (!volunteer) throw new DataNotFoundException("Bénévole introuvable");
+
+    let skillsId: number[] | null = null;
+    let skillsNames: string[] | null = null;
+
+    if (skills) {
+      if (
+        !Array.isArray(skills) ||
+        skills.some((skill) => typeof skill !== "string")
+      )
+        throw new ArgumentRequiredException(
+          "Toutes les compétences doivent être des chaînes de caractères"
+        );
+
+      const skillRows = await this.skillsService.getSkillsIdByNames(skills);
+      console.log("skillrows:", skillRows);
+
+      if (!skillRows)
+        throw new DataNotFoundException("Aucune compétence valide trouvée");
+
+      skillsNames = skillRows.map((row) => row.name);
+      console.log("skillsNames:", skillsNames);
+
+      const missingSkills = skills.filter(
+        (skill) => !skillsNames!.includes(skill)
+      );
+      console.log("missingSkills:", missingSkills);
+
+      if (missingSkills.length > 0)
+        throw new DataNotFoundException(
+          `Compétences introuvables : ${missingSkills.join(", ")}`
+        );
+      skillsId = skillRows.map((row) => row.id);
+    }
+    await this.volunteersRepository.updateVolunteer(
+      volunteer.id,
+      city,
+      skillsId
+    );
+    return { id: volunteer.id, city, skills: skillsNames };
+  }
+
+  async deleteVolunteerByUserId(userId: string) {
+    const volunteer = await this.getVolunteerByUserId(userId);
+    if (!volunteer) throw new DataNotFoundException("Bénévole introuvable");
+
+    const roleId = await this.rolesService.getRoleIdByName("volunteer");
+    if (!roleId)
+      throw new DataNotFoundException("Rôle 'volunteer' introuvable");
+
+    return await this.volunteersRepository.deleteVolunteerByUserId(
+      userId,
+      roleId
+    );
   }
 }

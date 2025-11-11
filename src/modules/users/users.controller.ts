@@ -15,6 +15,25 @@ export class UsersController {
     }
   }
 
+  async getUserById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.params.id;
+      const user = await this.usersService.getUserById(userId);
+      res.status(200).json(user);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getAllUsers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const users = await this.usersService.getAllUsers();
+      res.status(200).json(users);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async updateUser(req: Request, res: Response, next: NextFunction) {
     try {
       const data = req.body;
