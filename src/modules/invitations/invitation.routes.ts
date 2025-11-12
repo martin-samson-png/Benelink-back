@@ -11,5 +11,9 @@ export const inviationRoutes = (
     invitationsController.createInvitation(req, res, next)
   );
 
+  router.post("/accept/:token", checkAuth, (req, res, next) =>
+    invitationsController.acceptInvitation(req, res, next)
+  );
+
   return router;
 };

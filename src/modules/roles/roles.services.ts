@@ -14,6 +14,10 @@ export class RolesService {
     return roleId;
   }
 
+  async getUserRole(userId: string, roleId: number) {
+    return await this.rolesRepository.getUserRole(userId, roleId);
+  }
+
   async deleteUserRoleByName(userId: string, roleName: string) {
     await this.getRoleIdByName(roleName);
 

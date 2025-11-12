@@ -13,13 +13,3 @@ export interface Association {
   created_at: string;
   updated_at: string;
 }
-
-export interface Invitation {
-  id: number;
-  token: string;
-  associationId: string;
-  created_by: string;
-  used_by: string;
-  email: string;
-  expire_at: string;
-}

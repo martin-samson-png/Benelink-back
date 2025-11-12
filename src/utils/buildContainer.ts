@@ -52,7 +52,8 @@ export const buildContainer = () => {
   const invitationsService = new InvitationsService(
     invitationsRepository,
     userService,
-    associationsService
+    associationsService,
+    rolesService
   );
 
   const authController = new AuthController(authService);

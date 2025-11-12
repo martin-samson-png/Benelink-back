@@ -17,6 +17,14 @@ export class RolesRepository {
     }
   }
 
+  async getUserRole(userId: string, roleId: number) {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT * FROM user_roles WHERE user_id=? AND role_id=?`,
+      [userId, roleId]
+    );
+    return rows[0];
+  }
+
   async deleteUserRoleByName(userId: string, roleName: string) {
     const [result] = await this.pool.query<ResultSetHeader>(
       `DELETE ur FROM user_roles ur
