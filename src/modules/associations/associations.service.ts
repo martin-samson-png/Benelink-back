@@ -34,6 +34,18 @@ export class AssociationsService {
     return await this.associationsRepository.getAllAssociations();
   }
 
+  async findMemberInAssociation(userId: string, associationId: string) {
+    const member = await this.associationsRepository.findMemberInAssociation(
+      userId,
+      associationId
+    );
+    if (!member)
+      throw new ForbiddenException(
+        "Accès refusé :  Vous ne faites pas partis de l'association"
+      );
+    return member;
+  }
+
   async createAssociation(data: CreateAssociationDTO) {
     if (!data.asso_name || !data.rna || !data.city || !data.contact_email)
       throw new ArgumentRequiredException("Champs obligatoire manquant");
@@ -74,15 +86,9 @@ export class AssociationsService {
     if (!association)
       throw new DataNotFoundException("Association introuvable");
 
-    const member = await this.associationsRepository.findMemberInAssociation(
-      data.userId,
-      data.id
-    );
-    if (!member)
-      throw new ForbiddenException(
-        "Accès refusé :  Vous ne faites pas partis de l'association"
-      );
-    if (!["owner", "admin"].includes(member.role))
+    const member = await this.findMemberInAssociation(data.userId, data.id);
+
+    if (!["owner", "admin_asso"].includes(member.role))
       throw new ForbiddenException(
         "Vous n'avez pas les droits pour modifier cette association"
       );

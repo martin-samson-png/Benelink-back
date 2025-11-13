@@ -9,6 +9,7 @@ import { AssociationsRouter } from "./modules/associations/associations.routes";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { handleError } from "./middlewares/handleError";
 import { inviationRoutes } from "./modules/invitations/invitation.routes";
+import { missionsRoutes } from "./modules/missions/missions.routes";
 
 dotenv.config();
 const app = express();
@@ -24,12 +25,14 @@ const volunteersController = container.volunteersController;
 const associationsController = container.associationsController;
 const authController = container.authController;
 const invitationsController = container.invitationsController;
+const missionsController = container.missionsController;
 
 app.use("/auth", authRoutes(authController));
 app.use("/users", userRoutes(userController));
 app.use("/volunteers", volunteersRoutes(volunteersController));
 app.use("/associations", AssociationsRouter(associationsController));
 app.use("/invitations", inviationRoutes(invitationsController));
+app.use("/missions", missionsRoutes(missionsController));
 
 app.use(handleError);
 

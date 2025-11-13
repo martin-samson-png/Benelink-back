@@ -7,6 +7,7 @@ import { AssociationsRepository } from "../modules/associations/associations.rep
 import { RolesRepository } from "../modules/roles/roles.repository";
 import { SkillsRepository } from "../modules/skills/skills.repository";
 import { InvitationsRepository } from "../modules/invitations/invitations.repository";
+import { MissionsRepository } from "../modules/missions/missions.repository";
 import { AuthService } from "../modules/auth/auth.service";
 import { UsersService } from "../modules/users/users.service";
 import { VolunteersService } from "../modules/volunteers/volunteers.service";
@@ -14,11 +15,13 @@ import { AssociationsService } from "../modules/associations/associations.servic
 import { RolesService } from "../modules/roles/roles.services";
 import { SkillsService } from "../modules/skills/skills.service";
 import { InvitationsService } from "../modules/invitations/invitations.service";
+import { MissionsService } from "../modules/missions/missions.service";
 import { AuthController } from "../modules/auth/auth.controller";
 import { UsersController } from "../modules/users/users.controller";
 import { VolunteersController } from "../modules/volunteers/volunteers.controller";
 import { AssociationsController } from "../modules/associations/associations.controller";
 import { InvitationsController } from "./../modules/invitations/invitations.controller";
+import { MissionsController } from "../modules/missions/missions.controller";
 
 export const buildContainer = () => {
   const pool: Pool = getPool();
@@ -30,6 +33,7 @@ export const buildContainer = () => {
   const rolesRepository = new RolesRepository(pool);
   const skillsRepository = new SkillsRepository(pool);
   const invitationsRepository = new InvitationsRepository(pool);
+  const missionsRepository = new MissionsRepository(pool);
 
   const rolesService = new RolesService(rolesRepository);
   const skillsService = new SkillsService(skillsRepository);
@@ -55,6 +59,11 @@ export const buildContainer = () => {
     associationsService,
     rolesService
   );
+  const missionsService = new MissionsService(
+    missionsRepository,
+    associationsService,
+    userService
+  );
 
   const authController = new AuthController(authService);
   const userController = new UsersController(userService);
@@ -63,6 +72,7 @@ export const buildContainer = () => {
     associationsService
   );
   const invitationsController = new InvitationsController(invitationsService);
+  const missionsController = new MissionsController(missionsService);
 
   return {
     userController,
@@ -70,5 +80,6 @@ export const buildContainer = () => {
     associationsController,
     authController,
     invitationsController,
+    missionsController,
   };
 };

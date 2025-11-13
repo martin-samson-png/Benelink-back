@@ -1,7 +1,9 @@
 export interface CreateMissionDTO {
-  association_id: string;
+  associationId: string;
   title: string;
-  descr: string;
-  start_date: string;
-  end_date: string;
+  city: string;
+  createdBy: string;
+  descr?: string;
+  startDate: string | Date;
+  endDate: string | Date;
 }
