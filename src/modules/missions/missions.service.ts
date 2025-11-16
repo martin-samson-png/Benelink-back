@@ -69,6 +69,30 @@ export class MissionsService {
     return await this.missionsRepository.getAllMissions();
   }
 
+  async getBrowsing(
+    userId: string,
+    associationId: string
+  ): Promise<MissionWithDetailsDTO[]> {
+    if (!associationId)
+      throw new ArgumentRequiredException("AssociationId manquant");
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new DataNotFoundException("Utilisateur introuvable");
+
+    const association = await this.associationsService.getAssociationById(
+      associationId
+    );
+    if (!association)
+      throw new DataNotFoundException("Association introuvable");
+
+    await this.associationsService.findMemberInAssociation(
+      userId,
+      associationId
+    );
+
+    return await this.missionsRepository.getBrowsing(associationId);
+  }
+
   async createMission(data: CreateMissionDTO): Promise<MissionWithDetailsDTO> {
     if (
       !data.associationId ||
@@ -150,7 +174,7 @@ export class MissionsService {
     );
     if (!["owner", "admin_asso"].includes(membership.role))
       throw new ForbiddenException(
-        "Vous n'avez pas les droits pour créer des missions"
+        "Vous n'avez pas les droits pour modifer des missions"
       );
     const finalStartDateRow = data.startDate ?? oldMission.startDate;
     const finalEndDateRow = data.endDate ?? oldMission.endDate;
@@ -198,7 +222,7 @@ export class MissionsService {
     );
     if (!["owner", "admin_asso"].includes(membership.role))
       throw new ForbiddenException(
-        "Vous n'avez pas les droits pour créer des missions"
+        "Vous n'avez pas les droits pour supprimer des missions"
       );
 
     return await this.missionsRepository.deleteMission(missionId);

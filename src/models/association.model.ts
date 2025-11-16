@@ -1,15 +1,17 @@
+import { AssociationMember } from "./associationMember.model";
+
 export interface Association {
   id: string;
-  userId: string;
-  asso_name: string;
+  assoName: string;
   rna: string;
-  verified: boolean;
-  descr: string;
-  website_url: string;
-  social_link: string;
-  contact_email: string;
-  rate: number;
   city: string;
-  created_at: string;
-  updated_at: string;
+  descr?: string;
+  websiteUrl?: string;
+  socialLink?: string;
+  contactEmail: string;
+  verified: boolean;
+  rate: number;
+  createdAt: string;
+  updatedAt: string;
+  member: AssociationMember[];
 }

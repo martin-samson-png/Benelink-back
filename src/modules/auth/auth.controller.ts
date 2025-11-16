@@ -6,9 +6,9 @@ export class AuthController {
 
   async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.body;
-      await this.authService.register(user);
-      res.status(201).json({ message: "Utilisateur créé" });
+      const data = req.body;
+      const user = await this.authService.register(data);
+      res.status(201).json(user);
     } catch (err) {
       next(err);
     }
@@ -16,27 +16,25 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, password } = req.body;
-      const { token, user } = await this.authService.login({ email, password });
+      const { token, user } = await this.authService.login(req.body);
+
       res.cookie("token", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         expires: new Date(Date.now() + 3600000),
       });
+
       res.status(200).json(user);
     } catch (err) {
       next(err);
     }
   }
 
-  async authentification(req: Request, res: Response, next: NextFunction) {
+  async getAuthentificated(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Utilisateur non authentifié" });
-      }
-      const user = await this.authService.getAuthenticatedUser(userId);
+      const userId = req.user!.id;
+      const user = await this.authService.getAuthentificated(userId);
       res.status(200).json(user);
     } catch (err) {
       next(err);
@@ -51,7 +49,7 @@ export class AuthController {
         secure: true,
         expires: new Date(0),
       });
-      res.status(200).json({ message: "Deconnexion réussie" });
+      res.status(200).json({ message: "Déconnexion réussie" });
     } catch (err) {
       next(err);
     }
@@ -71,7 +69,12 @@ export class AuthController {
     try {
       const { email } = req.body;
       await this.authService.saveResetToken(email);
-      res.status(200).json({ message: "Email envoyé" });
+      res
+        .status(200)
+        .json({
+          message:
+            "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
+        });
     } catch (err) {
       next(err);
     }

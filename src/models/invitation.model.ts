@@ -1,11 +1,12 @@
+import { Association } from "./association.model";
+import { User } from "./user.model";
+
 export interface Invitations {
   id: number;
   token: string;
-  association_id: string;
-  created_by: string;
-  used_by: string;
-  email: string;
+  association: Association;
+  createdBy: User;
+  usedBy?: User | null;
   status: "pending" | "accepted" | "expired";
-  expires_at: string;
-  created_at: string;
+  expiresAt: string;
 }

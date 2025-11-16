@@ -6,8 +6,10 @@ import { UsersRepository } from "./users.repository";
 import { RolesService } from "../roles/roles.services";
 import DataNotFoundException from "./../../exceptions/data.not.found";
 import { UpdateUserDTO } from "./dto/update-user.dto";
-import { cleanUser } from "../../utils/users.utils";
-import { CleanUser } from "../../models/users.model";
+import { User } from "../../models/user.model";
+import { AuthUser } from "../../models/auth.models";
+import ForbiddenException from "../../exceptions/forbidden";
+import { ChangePasswordDTO } from "./dto/change-password.dto";
 
 export class UsersService {
   constructor(
@@ -15,104 +17,140 @@ export class UsersService {
     private readonly rolesService: RolesService
   ) {}
 
-  async findByEmail(email: string) {
+  async getUserByEmail(email: string): Promise<AuthUser | null> {
     const user = await this.usersRepository.getUserByEmail(email);
-
     return user;
   }
 
-  async findById(id: string) {
+  async getUserById(id: string) {
     const user = await this.usersRepository.getUserById(id);
-    if (!user) throw new DataNotFoundException("Utilisateur introuvable");
-
     return user;
   }
 
-  async createUser(data: CreateUserDTO) {
+  async createUser(data: CreateUserDTO): Promise<User> {
     if (!data.firstname || !data.lastname || !data.email || !data.password)
-      throw new ArgumentRequiredException("Champs manquant obligatoire");
+      throw new ArgumentRequiredException("Informations manquantes");
 
-    const isEmailExist = await this.findByEmail(data.email);
+    const isEmailExist = await this.getUserByEmail(data.email);
     if (isEmailExist) throw new DataAlreadyExistException("Email existant");
 
     const hashedPassword = await argon2.hash(data.password, {
       type: argon2.argon2id,
     });
 
-    const id = crypto.randomUUID();
-    const roleId = await this.rolesService.getRoleIdByName("admin");
-    if (!roleId) throw new DataNotFoundException("Rôle 'admin' introuvable");
+    const userId = crypto.randomUUID();
+    const roleId = await this.rolesService.getRoleIdByName(
+      data.role ?? "admin"
+    );
+    if (!roleId)
+      throw new DataNotFoundException(`Rôle "${data.role}" introuvable `);
 
-    await this.usersRepository.createUser({
-      id,
+    return await this.usersRepository.createUser({
+      id: userId,
+      avatar: data.avatar,
       firstname: data.firstname,
       lastname: data.lastname,
       email: data.email,
+      phone: data.phone,
       password: hashedPassword,
-      roleId,
+      roleId: roleId,
     });
   }
 
-  async getUserById(userId: string) {
-    if (!userId) throw new ArgumentRequiredException("Champs manquant");
-
-    const user = await this.findById(userId);
-    if (!user) throw new DataNotFoundException("Utilisateur introuvable");
-
-    return cleanUser(user);
-  }
-
-  async getAllUsers(): Promise<CleanUser[]> {
+  async getAllUsers() {
     const users = await this.usersRepository.getAllUsers();
-
-    return users.map(cleanUser);
+    return users;
   }
 
-  async updateUser(data: UpdateUserDTO, userId: string) {
-    if (!data || Object.keys(data).length === 0)
+  async updatePassword(data: ChangePasswordDTO & { userId: string }) {
+    if (!data.oldPassword || !data.password)
       throw new ArgumentRequiredException("Champs obligatoire manquant");
-
-    if (!data.oldPassword)
-      throw new ArgumentRequiredException("Ancien mot de passe requis");
-
-    const currentUser = await this.findById(userId);
+    const currentUser = await this.usersRepository.getUserByIdRaw(data.userId);
     if (!currentUser) throw new DataNotFoundException("Utilisateur inexistant");
 
-    const verifyPassword = await argon2.verify(
+    const isOldPasswordValid = await argon2.verify(
       currentUser.password,
       data.oldPassword
     );
-    if (!verifyPassword)
-      throw new ArgumentRequiredException("Mot de passe incorrect");
+    if (!isOldPasswordValid)
+      throw new ForbiddenException("Ancien mot de passe incorrect");
 
-    const updatePayload: Partial<UpdateUserDTO> = {};
+    const samePassord = await argon2.verify(
+      currentUser.password,
+      data.password
+    );
 
-    if (data.firstname) updatePayload.firstname = data.firstname;
-    if (data.lastname) updatePayload.lastname = data.lastname;
+    if (samePassord)
+      throw new ArgumentRequiredException(
+        "Le nouveau mot de passe doit être différent de l'ancien."
+      );
 
-    if (data.email) {
-      const isEmailExist = await this.findByEmail(data.email);
-      if (isEmailExist && isEmailExist.id !== userId)
+    const hashedPassword = await argon2.hash(data.password, {
+      type: argon2.argon2id,
+    });
+
+    return await this.usersRepository.updatePassword({
+      ...data,
+      password: hashedPassword,
+    });
+  }
+
+  async updateFields(data: UpdateUserDTO & { userId: string }) {
+    const { userId, ...fields } = data;
+    if (Object.keys(fields).length === 0)
+      throw new ArgumentRequiredException("Champs obligatoire manquant");
+
+    console.log(userId);
+
+    const currentUser = await this.getUserById(userId);
+    if (!currentUser) throw new DataNotFoundException("Utilisateur inexistant");
+
+    const updatePayload: UpdateUserDTO = {};
+
+    if (fields.firstname && fields.firstname !== currentUser.firstname)
+      updatePayload.firstname = fields.firstname;
+
+    if (fields.lastname && fields.lastname !== currentUser.lastname)
+      updatePayload.lastname = fields.lastname;
+
+    if (fields.avatar && fields.avatar !== currentUser.avatar)
+      updatePayload.avatar = fields.avatar;
+
+    if (fields.phone && fields.phone !== currentUser.phone)
+      updatePayload.phone = fields.phone;
+
+    if (fields.email && fields.email !== currentUser.email) {
+      const isEmailExist = await this.getUserByEmail(fields.email);
+      if (isEmailExist && isEmailExist.id !== data.userId)
         throw new DataAlreadyExistException("Email existant");
-      updatePayload.email = data.email;
-    }
-
-    if (data.password) {
-      const hashedPassword = await argon2.hash(data.password, {
-        type: argon2.argon2id,
-      });
-      updatePayload.password = hashedPassword;
+      updatePayload.email = fields.email;
     }
 
     if (Object.keys(updatePayload).length === 0)
       throw new ArgumentRequiredException("Aucune donnée à mettre à jour");
 
-    return await this.usersRepository.updateUser(updatePayload, userId);
+    return await this.usersRepository.updateFields({
+      ...updatePayload,
+      userId,
+    });
   }
 
-  async deleteUserById(userId: string) {
-    const user = await this.findById(userId);
-    if (!user) throw new Error("Utilisateur non trouvé");
+  async deleteUserById({
+    userId,
+    password,
+  }: {
+    userId: string;
+    password: string;
+  }): Promise<{ ok: true }> {
+    if (!password) throw new ArgumentRequiredException("Mot de passe requis");
+
+    const currentUser = await this.usersRepository.getUserByIdRaw(userId);
+    if (!currentUser) throw new Error("Utilisateur non trouvé");
+
+    const isPasswordValid = await argon2.verify(currentUser.password, password);
+
+    if (!isPasswordValid)
+      throw new ForbiddenException("Mot de passe incorrect");
 
     return await this.usersRepository.deleteUserById(userId);
   }

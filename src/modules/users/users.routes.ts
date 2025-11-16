@@ -14,11 +14,16 @@ export const userRoutes = (usersController: UsersController): Router => {
   router.get("/", (req, res, next) =>
     usersController.getAllUsers(req, res, next)
   );
-  router.put("/update", checkAuth, (req, res, next) =>
-    usersController.updateUser(req, res, next)
+
+  router.patch("/update/password", checkAuth, (req, res, next) =>
+    usersController.updatePassword(req, res, next)
   );
 
-  router.delete("/me", checkAuth, (req, res, next) =>
+  router.patch("/update/fields", checkAuth, (req, res, next) =>
+    usersController.updateFields(req, res, next)
+  );
+
+  router.delete("/delete", checkAuth, (req, res, next) =>
     usersController.deleteUserById(req, res, next)
   );
 

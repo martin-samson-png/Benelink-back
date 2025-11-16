@@ -13,14 +13,17 @@ export const missionsRoutes = (
   router.get("/association/:associationId", (req, res, next) =>
     missionsController.getMissionByAssociationId(req, res, next)
   );
-  router.get("/:id", (req, res, next) =>
-    missionsController.getMissionById(req, res, next)
-  );
   router.get("/me/:associationId", checkAuth, (req, res, next) =>
     missionsController.getMissionByCreator(req, res, next)
   );
+  router.get("/:id", (req, res, next) =>
+    missionsController.getMissionById(req, res, next)
+  );
   router.get("/", (req, res, next) =>
     missionsController.getAllMissions(req, res, next)
+  );
+  router.get("/browsing/:associationId", checkAuth, (req, res, next) =>
+    missionsController.getBrowsing(req, res, next)
   );
   router.patch("/update", checkAuth, (req, res, next) =>
     missionsController.updateMission(req, res, next)

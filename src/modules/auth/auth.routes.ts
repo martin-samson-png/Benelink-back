@@ -15,7 +15,7 @@ export const authRoutes = (authController: AuthController): Router => {
     authController.logout(req, res, next)
   );
   router.get("/me", checkAuth, (req, res, next) =>
-    authController.authentification(req, res, next)
+    authController.getAuthentificated(req, res, next)
   );
 
   router.put("/reset-password", (req, res, next) =>

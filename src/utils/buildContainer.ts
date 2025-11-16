@@ -22,6 +22,9 @@ import { VolunteersController } from "../modules/volunteers/volunteers.controlle
 import { AssociationsController } from "../modules/associations/associations.controller";
 import { InvitationsController } from "./../modules/invitations/invitations.controller";
 import { MissionsController } from "../modules/missions/missions.controller";
+import { ApplicationsRepository } from "../modules/applications/applications.repository";
+import { ApplicationsService } from "../modules/applications/applications.service";
+import { ApplicationsController } from "../modules/applications/applications.controller";
 
 export const buildContainer = () => {
   const pool: Pool = getPool();
@@ -34,6 +37,7 @@ export const buildContainer = () => {
   const skillsRepository = new SkillsRepository(pool);
   const invitationsRepository = new InvitationsRepository(pool);
   const missionsRepository = new MissionsRepository(pool);
+  const applicationsRepository = new ApplicationsRepository(pool);
 
   const rolesService = new RolesService(rolesRepository);
   const skillsService = new SkillsService(skillsRepository);
@@ -64,6 +68,11 @@ export const buildContainer = () => {
     associationsService,
     userService
   );
+  const applicationsService = new ApplicationsService(
+    applicationsRepository,
+    userService,
+    missionsService
+  );
 
   const authController = new AuthController(authService);
   const userController = new UsersController(userService);
@@ -73,6 +82,9 @@ export const buildContainer = () => {
   );
   const invitationsController = new InvitationsController(invitationsService);
   const missionsController = new MissionsController(missionsService);
+  const applicationsController = new ApplicationsController(
+    applicationsService
+  );
 
   return {
     userController,
@@ -81,5 +93,6 @@ export const buildContainer = () => {
     authController,
     invitationsController,
     missionsController,
+    applicationsController,
   };
 };

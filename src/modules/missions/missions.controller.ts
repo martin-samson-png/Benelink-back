@@ -53,6 +53,20 @@ export class MissionsController {
     }
   }
 
+  async getBrowsing(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.id;
+      const { associationId } = req.params;
+      const browsing = await this.missionsService.getBrowsing(
+        userId,
+        associationId
+      );
+      res.status(200).json(browsing);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async createMission(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;

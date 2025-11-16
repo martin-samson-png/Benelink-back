@@ -1,7 +1,11 @@
+import { Mission } from "./mission.model";
+import { Volunteer } from "./volunteer.model";
+
 export interface Application {
   id: number;
-  volunteerId: string;
-  missionId: number;
-  status: "pending" | "accept" | "reject";
+  volunteer: Volunteer;
+  mission: Mission;
+  status: "pending" | "accepted" | "rejected";
   createdAt: string;
+  updatedAt: string;
 }

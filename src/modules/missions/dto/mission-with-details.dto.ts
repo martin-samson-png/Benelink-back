@@ -5,7 +5,7 @@ export interface MissionWithDetailsDTO {
   missionCity: string;
   startDate: string;
   endDate: string;
-  status: string;
+  status: "open" | "close";
   rate: number | null;
   createdAt: string;
   updatedAt: string;

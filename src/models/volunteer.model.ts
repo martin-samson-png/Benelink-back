@@ -1,12 +1,12 @@
-import { Skills } from "./skills.model";
+import { Skill } from "./skill.model";
+import { User } from "./user.model";
 
 export interface Volunteer {
   id: string;
-  userId: string;
   city: string;
-  skills: Skills[];
   experience: "novice" | "regular" | "expert";
+  user: User;
+  skills: Skill[];
   createdAt: string;
   updatedAt: string;
-  rate: number;
 }

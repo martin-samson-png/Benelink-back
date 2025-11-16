@@ -1,44 +1,79 @@
-import { User } from "../../models/users.model";
-import { Pool, ResultSetHeader } from "mysql2/promise";
-import { CreateUserDTO } from "./dto/create-user.dto";
+import { User } from "../../models/user.model";
+import {
+  Pool,
+  ResultSetHeader,
+  RowDataPacket,
+  PoolConnection,
+} from "mysql2/promise";
 import { InternalServerException } from "../../exceptions/internal.server.exception";
 import { UpdateUserDTO } from "./dto/update-user.dto";
+import { mapUser } from "../../mappers/user.mapper";
+import { UserRow } from "./dto/user.row";
+import { CreateUserRepositoryDTO } from "./dto/create-user-repository.dto";
+import { AuthUser } from "../../models/auth.models";
+import { mapAuthUser } from "../../mappers/auth.mapper";
+import { ChangePasswordDTO } from "./dto/change-password.dto";
 
 export class UsersRepository {
   constructor(private readonly pool: Pool) {}
 
-  async getUserByEmail(email: string): Promise<User | null> {
-    const [rows] = await this.pool.query(
-      "SELECT * FROM users WHERE email = ?",
+  async getUserByEmail(email: string): Promise<AuthUser | null> {
+    const [rows] = await this.pool.query<(UserRow & RowDataPacket)[]>(
+      `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id WHERE u.email=? GROUP BY u.id`,
       [email]
     );
 
-    const users = rows as User[];
-    return users.length > 0 ? users[0] : null;
+    if (rows.length === 0) return null;
+
+    return mapAuthUser(rows[0]);
+  }
+
+  async getUserByIdRaw(id: string): Promise<AuthUser | null> {
+    const [rows] = await this.pool.query<(UserRow & RowDataPacket)[]>(
+      `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
+      [id]
+    );
+    if (rows.length === 0) return null;
+    return mapAuthUser(rows[0]);
   }
 
   async getUserById(id: string): Promise<User | null> {
-    const [rows] = await this.pool.query("SELECT * FROM users WHERE id = ?", [
-      id,
-    ]);
-
-    const user = rows as User[];
-    return user.length > 0 ? user[0] : null;
+    const [rows] = await this.pool.query<(UserRow & RowDataPacket)[]>(
+      `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
+      [id]
+    );
+    if (rows.length === 0) return null;
+    return mapUser(rows[0]);
   }
 
   async getAllUsers(): Promise<User[]> {
-    const [rows] = await this.pool.query(`SELECT * FROM users`);
-    return rows as User[];
+    const [rows] = await this.pool.query<(RowDataPacket & UserRow)[]>(
+      `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id GROUP BY u.id`
+    );
+    return rows.map((r) => mapUser(r));
   }
 
-  async createUser(data: CreateUserDTO & { id: string; roleId: number }) {
-    const connection = await this.pool.getConnection();
+  async createUser(data: CreateUserRepositoryDTO): Promise<User> {
+    const connection: PoolConnection = await this.pool.getConnection();
     try {
       await connection.beginTransaction();
       const [userResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO users(id, firstname, lastname, email, password) VALUES (?, ?, ?, ?, ?)`,
-        [data.id, data.firstname, data.lastname, data.email, data.password]
+        `INSERT INTO users(id, avatar, firstname, lastname, email, password, phone) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          data.id,
+          data.avatar ?? null,
+          data.firstname,
+          data.lastname,
+          data.email,
+          data.password,
+          data.phone ?? null,
+        ]
       );
+
       if (userResult.affectedRows === 0)
         throw new InternalServerException(
           "Echec de la création de l'utilisateur"
@@ -48,11 +83,24 @@ export class UsersRepository {
         `INSERT INTO user_roles(user_id, role_id) VALUES (? , ?)`,
         [data.id, data.roleId]
       );
+
       if (roleResult.affectedRows === 0)
-        throw new InternalServerException("Echec de l'attribution du rôle");
+        throw new InternalServerException("Echec de l'attribution du role");
 
       await connection.commit();
-      return { ok: true };
+
+      const [rows] = await this.pool.query<(RowDataPacket & UserRow)[]>(
+        `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
+        [data.id]
+      );
+
+      if (!rows.length)
+        throw new InternalServerException(
+          "Utilisateur introuvable après insertion"
+        );
+
+      return mapUser(rows[0]);
     } catch (err) {
       if (connection) await connection.rollback();
       console.error("Erreur transaction", err);
@@ -62,33 +110,64 @@ export class UsersRepository {
     }
   }
 
-  async updateUser(data: Omit<UpdateUserDTO, "oldPassword">, userId: string) {
-    try {
-      const key = Object.keys(data);
-      const values = Object.values(data);
-      const setkey = key.map((k) => `${k} = ?`).join(", ");
-      await this.pool.query<ResultSetHeader>(
-        `UPDATE users SET ${setkey} WHERE id=?`,
-        [...values, userId]
+  async updatePassword(
+    data: ChangePasswordDTO & { userId: string }
+  ): Promise<User> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `UPDATE users SET password=? WHERE id=?`,
+      [data.password, data.userId]
+    );
+    if (result.affectedRows === 0)
+      throw new InternalServerException(
+        "Erreur lors de la mise à jour du mot de passe"
       );
-      return { ok: true };
-    } catch {
+    const [rows] = await this.pool.query<(RowDataPacket & UserRow)[]>(
+      `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
+      [data.userId]
+    );
+    if (rows.length === 0)
+      throw new InternalServerException(
+        "Utilisateur introuvable après modification"
+      );
+    return mapUser(rows[0]);
+  }
+
+  async updateFields(data: UpdateUserDTO & { userId: string }): Promise<User> {
+    const { userId, ...fields } = data;
+    const key = Object.keys(fields);
+    const values = Object.values(fields);
+    const setkey = key.map((k) => `${k} = ?`).join(", ");
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `UPDATE users SET ${setkey} WHERE id=?`,
+      [...values, userId]
+    );
+
+    if (result.affectedRows === 0)
       throw new InternalServerException(
         "Erreur lors de la modification de l'utilisateur"
       );
-    }
+    const [rows] = await this.pool.query<(RowDataPacket & UserRow)[]>(
+      `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
+       JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
+      [userId]
+    );
+    if (rows.length === 0)
+      throw new InternalServerException(
+        "Utilisateur introuvable après modification de l'utilisateur"
+      );
+    return mapUser(rows[0]);
   }
 
-  async deleteUserById(userId: string) {
-    try {
-      await this.pool.query<ResultSetHeader>(`DELETE FROM users WHERE id=?`, [
-        userId,
-      ]);
-      return { ok: true };
-    } catch {
+  async deleteUserById(userId: string): Promise<{ ok: true }> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `DELETE FROM users WHERE id=?`,
+      [userId]
+    );
+    if (result.affectedRows === 0)
       throw new InternalServerException(
         "Erreur lors de la suppression de l'utilisateur"
       );
-    }
+    return { ok: true };
   }
 }

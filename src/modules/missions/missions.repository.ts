@@ -10,20 +10,27 @@ export class MissionsRepository {
   async getMissionByAssociationId(
     associationId: string
   ): Promise<MissionWithDetailsDTO[]> {
-    try {
-      const [rows] = await this.pool.query<RowDataPacket[]>(
-        `SELECT m.id AS missionId, m.title, m.descr, m.city AS missionCity, m.start_date, m.end_date, m.status, m.rate, m.created_at, m.updated_at, 
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT m.id AS missionId, m.title, m.descr, m.city AS missionCity, m.start_date, m.end_date, m.status, m.rate, m.created_at, m.updated_at, 
         u.id AS userId, u.firstname, u.lastname, u.email, 
         a.id AS assoId, a.asso_name, a.description, a.city AS assoCity, a.website_url, a.social_link 
         FROM missions m JOIN users u ON m.created_by=u.id JOIN associations a ON m.association_id=a.id
         WHERE association_id=?`,
-        [associationId]
-      );
-      return mapRows<MissionWithDetailsDTO>(rows);
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
+      [associationId]
+    );
+    return mapRows<MissionWithDetailsDTO>(rows);
+  }
+
+  async getMissionByCity(city: string): Promise<MissionWithDetailsDTO[]> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT m.id AS missionId, m.title, m.descr, m.city AS missionCity, m.start_date, m.end_date, m.status, m.rate, m.created_at, m.updated_at, 
+        u.id AS userId, u.firstname, u.lastname, u.email, 
+        a.id AS assoId, a.asso_name, a.description, a.city AS assoCity, a.website_url, a.social_link 
+        FROM missions m JOIN users u ON m.created_by=u.id JOIN associations a ON m.association_id=a.id
+        WHERE association_id=?`,
+      [city]
+    );
+    return mapRows<MissionWithDetailsDTO>(rows);
   }
 
   async getMissionById(
@@ -54,7 +61,8 @@ export class MissionsRepository {
         `SELECT m.id AS missionId, m.title, m.descr, m.city AS missionCity, m.start_date, m.end_date, m.status, m.rate, m.created_at, m.updated_at, 
          u.id AS userId, u.firstname, u.lastname, u.email, 
          a.id AS assoId, a.asso_name, a.description, a.city AS assoCity, a.website_url, a.social_link 
-         FROM missions m JOIN users u ON m.created_by=u.id JOIN associations a ON m.association_id=a.id   WHERE created_by=? AND association_id=?`,
+         FROM missions m JOIN users u ON m.created_by=u.id JOIN associations a ON m.association_id=a.id 
+         WHERE created_by=? AND association_id=?`,
         [userId, associationId]
       );
 
@@ -80,6 +88,19 @@ export class MissionsRepository {
       console.error(err);
       throw err;
     }
+  }
+
+  async getBrowsing(associationId: string): Promise<MissionWithDetailsDTO[]> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT m.id AS missionId, m.title, m.descr, m.city AS missionCity, m.start_date, m.end_date, m.status, m.rate, m.created_at, m.updated_at, 
+         u.id AS userId, u.firstname, u.lastname, u.email, 
+         a.id AS assoId, a.asso_name, a.description, a.city AS assoCity, a.website_url, a.social_link 
+         FROM missions m JOIN users u ON m.created_by=u.id JOIN associations a ON m.association_id=a.id 
+         WHERE association_id=? AND status="close"`,
+      [associationId]
+    );
+
+    return mapRows<MissionWithDetailsDTO>(rows);
   }
 
   async isMissionUnique(

@@ -1,4 +1,4 @@
-import { Volunteer } from "../../models/volunteers.model";
+import { Volunteer } from "../../models/volunteer.model";
 import { Pool, ResultSetHeader, PoolConnection } from "mysql2/promise";
 import { CreateVolunteerDTO } from "./dto/create-volunteer.dto";
 import { InternalServerException } from "../../exceptions/internal.server.exception";

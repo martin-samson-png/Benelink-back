@@ -1,7 +1,7 @@
 export interface UpdateUserDTO {
+  avatar?: string;
   firstname?: string;
   lastname?: string;
   email?: string;
-  password?: string;
-  oldPassword: string;
+  phone?: string;
 }
