@@ -1,8 +1,7 @@
-import { User } from "./user.model";
+import { UserLight } from "./user-light.model";
 
 export interface AssociationMember {
-  id: string;
-  user: User;
-  role: "owner" | "admin" | "member";
+  user: UserLight;
+  role: string;
   joinedAt: string;
 }

@@ -5,13 +5,13 @@ export interface Association {
   assoName: string;
   rna: string;
   city: string;
-  descr?: string;
-  websiteUrl?: string;
-  socialLink?: string;
+  descr: string;
+  websiteUrl?: string | null;
+  socialLink?: string | null;
   contactEmail: string;
   verified: boolean;
   rate: number;
   createdAt: string;
   updatedAt: string;
-  member: AssociationMember[];
+  members: AssociationMember[];
 }

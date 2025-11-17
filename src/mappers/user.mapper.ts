@@ -10,5 +10,5 @@ export const mapUser = (row: UserRow): User => ({
   phone: row.phone,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
-  roles: JSON.parse(row.roles).map((name: string) => ({ name })) ?? [],
+  roles: row.roles ? JSON.parse(row.roles) : [],
 });

@@ -1,68 +1,50 @@
 import { Volunteer } from "../../models/volunteer.model";
-import { Pool, ResultSetHeader, PoolConnection } from "mysql2/promise";
-import { CreateVolunteerDTO } from "./dto/create-volunteer.dto";
+import {
+  Pool,
+  ResultSetHeader,
+  PoolConnection,
+  RowDataPacket,
+} from "mysql2/promise";
 import { InternalServerException } from "../../exceptions/internal.server.exception";
+import { VolunteerRow } from "./dto/volunteer.rows";
+import { mapVolunteer } from "../../mappers/volunteers.mapper";
+import { CreateVolunteerRepositoryDTO } from "./dto/create-volunteer-repository.dto";
+import { UpdateVolunteerRepositoryDTO } from "./dto/update-volunteer-repository.dto";
 
 export class VolunteersRepository {
   constructor(private readonly pool: Pool) {}
 
   async getVolunteerById(volunteerId: string): Promise<Volunteer | null> {
-    try {
-      const [row] = await this.pool.query(
-        `SELECT * FROM volunteers WHERE id=?`,
-        [volunteerId]
-      );
-      const volunteer = row as Volunteer[];
-      return volunteer.length > 0 ? volunteer[0] : null;
-    } catch (err: any) {
-      console.log(err.message);
-      throw new InternalServerException(
-        "Erreur lors de la récuperation du bénévole"
-      );
-    }
+    const [rows] = await this.pool.query<(RowDataPacket & VolunteerRow)[]>(
+      `SELECT v.*, u.firstname, u.lastname, u.avatar, u.email, u.phone, JSON_ARRAYAGG(s.name) AS skills
+      FROM volunteers v JOIN users u ON v.user_id = u.id JOIN volunteer_skills vs ON vs.volunteer_id = v.id 
+      JOIN skills s ON vs.skills_id = s.id WHERE v.id=? GROUP BY v.id`,
+      [volunteerId]
+    );
+    if (rows.length === 0) return null;
+
+    return mapVolunteer(rows[0]);
   }
 
   async getVolunteerByUserId(userId: string): Promise<Volunteer | null> {
-    try {
-      const [row] = await this.pool.query(
-        `SELECT * FROM volunteers v WHERE user_id=?`,
-        [userId]
-      );
-      const volunteer = row as Volunteer[];
-      return volunteer.length > 0 ? volunteer[0] : null;
-    } catch (err: any) {
-      console.log(err.message);
+    const [rows] = await this.pool.query<(RowDataPacket & VolunteerRow)[]>(
+      `SELECT v.*, u.firstname, u.lastname, u.avatar, u.email, u.phone, JSON_ARRAYAGG(s.name) AS skills
+      FROM volunteers v JOIN users u ON v.user_id = u.id JOIN volunteer_skills vs ON vs.volunteer_id = v.id 
+      JOIN skills s ON vs.skills_id = s.id WHERE v.user_id=? GROUP BY v.id`,
+      [userId]
+    );
+    if (rows.length === 0) return null;
 
-      throw new InternalServerException(
-        "Erreur lors de la récuperation du bénévole"
-      );
-    }
+    return mapVolunteer(rows[0]);
   }
 
   async getAllVolunteers(): Promise<Volunteer[]> {
-    try {
-      const [rows] = await this.pool.query(`SELECT * FROM volunteers`);
-      return rows as Volunteer[];
-    } catch {
-      throw new InternalServerException(
-        "Erreur lors de la récuperation des bénévoles"
-      );
-    }
-  }
-
-  private async updateCity(
-    connection: PoolConnection,
-    volunteer_id: string,
-    city: string
-  ) {
-    const [result] = await connection.query<ResultSetHeader>(
-      `UPDATE volunteers SET city=? WHERE id=?`,
-      [city, volunteer_id]
+    const [rows] = await this.pool.query<(RowDataPacket & VolunteerRow)[]>(
+      `SELECT v.*, u.firstname, u.lastname, u.avatar, u.email, u.phone, JSON_ARRAYAGG(s.name) AS skills
+      FROM volunteers v JOIN users u ON v.user_id = u.id JOIN volunteer_skills vs ON vs.volunteer_id = v.id 
+      JOIN skills s ON vs.skills_id = s.id`
     );
-    if (result.affectedRows === 0)
-      throw new InternalServerException(
-        "Erreur lors de la modification du bénévole"
-      );
+    return rows.map((r) => mapVolunteer(r));
   }
 
   private async replaceSkills(
@@ -85,20 +67,15 @@ export class VolunteersRepository {
   }
 
   async createVolunteer(
-    data: Omit<CreateVolunteerDTO, "skills"> & {
-      volunteerId: string;
-      roleId: number;
-      skillsId: number[];
-    }
-  ) {
+    data: CreateVolunteerRepositoryDTO
+  ): Promise<Volunteer> {
     const connection: PoolConnection = await this.pool.getConnection();
-
     try {
       await connection.beginTransaction();
 
       const [volunteerResult] = await connection.query<ResultSetHeader>(
         `INSERT INTO volunteers(id, user_id, city) VALUES (?, ?, ?)`,
-        [data.volunteerId, data.userId, data.city]
+        [data.id, data.userId, data.city]
       );
       if (volunteerResult.affectedRows === 0)
         throw new InternalServerException("Echec de la création du bénévole");
@@ -111,10 +88,21 @@ export class VolunteersRepository {
       if (roleResult.affectedRows === 0)
         throw new InternalServerException("Echec de l'affectation du role");
 
-      await this.replaceSkills(connection, data.volunteerId, data.skillsId);
+      await this.replaceSkills(connection, data.id, data.skillsId);
 
       await connection.commit();
-      return { ok: true };
+      const [rows] = await this.pool.query<(RowDataPacket & VolunteerRow)[]>(
+        `SELECT v.*, u.firstname, u.lastname, u.avatar, u.email, u.phone, JSON_ARRAYAGG(s.name) AS skills
+        FROM volunteers v JOIN users u ON v.user_id = u.id JOIN volunteer_skills vs ON vs.volunteer_id = v.id 
+        JOIN skills s ON vs.skills_id = s.id WHERE v.id=? GROUP BY v.id`,
+        [data.id]
+      );
+      if (!rows.length)
+        throw new InternalServerException(
+          "Bénévole introuvable après insertion"
+        );
+
+      return mapVolunteer(rows[0]);
     } catch (err) {
       if (connection) await connection.rollback();
       console.error(err);
@@ -126,20 +114,38 @@ export class VolunteersRepository {
   }
 
   async updateVolunteer(
-    volunteerId: string,
-    city: string,
-    skillsId: number[] | null
+    data: UpdateVolunteerRepositoryDTO & { volunteerId: string }
   ) {
     const connection: PoolConnection = await this.pool.getConnection();
     try {
       await connection.beginTransaction();
 
-      if (city) await this.updateCity(connection, volunteerId, city);
+      if (data.city) {
+        const [result] = await connection.query<ResultSetHeader>(
+          `UPDATE volunteers SET city=? WHERE id=?`,
+          [data.city, data.volunteerId]
+        );
+        if (result.affectedRows === 0)
+          throw new InternalServerException(
+            "Erreur lors de la modification du bénévole"
+          );
+      }
 
-      if (skillsId) await this.replaceSkills(connection, volunteerId, skillsId);
+      if (data.skillsId)
+        await this.replaceSkills(connection, data.volunteerId, data.skillsId);
 
       await connection.commit();
-      return { ok: true };
+      const [rows] = await this.pool.query<(RowDataPacket & VolunteerRow)[]>(
+        `SELECT v.*, u.firstname, u.lastname, u.avatar, u.email, u.phone, JSON_ARRAYAGG(s.name) AS skills
+        FROM volunteers v JOIN users u ON v.user_id = u.id JOIN volunteer_skills vs ON vs.volunteer_id = v.id 
+        JOIN skills s ON vs.skills_id = s.id WHERE v.id=? GROUP BY v.id`,
+        [data.volunteerId]
+      );
+      if (!rows.length)
+        throw new InternalServerException(
+          "Bénévole introuvable après insertion"
+        );
+      return mapVolunteer(rows[0]);
     } catch (err) {
       if (connection) await connection.rollback();
       throw err;
@@ -148,7 +154,10 @@ export class VolunteersRepository {
     }
   }
 
-  async deleteVolunteerByUserId(userId: string, roleId: number) {
+  async deleteVolunteerByUserId(
+    userId: string,
+    roleId: number
+  ): Promise<{ ok: true }> {
     const connection: PoolConnection = await this.pool.getConnection();
     try {
       const [volunteerResult] = await connection.query<ResultSetHeader>(
@@ -158,6 +167,14 @@ export class VolunteersRepository {
       if (volunteerResult.affectedRows === 0)
         throw new InternalServerException(
           "Erreur lors de la suppression du bénévole"
+        );
+      const [roleResult] = await connection.query<ResultSetHeader>(
+        `DELETE FROM user_roles WHERE user_id = ? AND role_id = ?`,
+        [userId, roleId]
+      );
+      if (roleResult.affectedRows === 0)
+        throw new InternalServerException(
+          "Erreur lors de la suppression du role 'volunteer'"
         );
 
       return { ok: true };

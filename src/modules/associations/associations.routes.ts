@@ -19,11 +19,11 @@ export const AssociationsRouter = (
     associationsController.createAssociation(req, res, next)
   );
 
-  router.patch("/:id", checkAuth, (req, res, next) =>
+  router.patch("/update", checkAuth, (req, res, next) =>
     associationsController.updateAssociation(req, res, next)
   );
 
-  router.delete("/:id", checkAuth, (req, res, next) =>
+  router.delete("/delete", checkAuth, (req, res, next) =>
     associationsController.deleteAssociation(req, res, next)
   );
 

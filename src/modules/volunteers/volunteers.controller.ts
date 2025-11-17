@@ -18,10 +18,7 @@ export class VolunteersController {
 
   async getVolunteerByUserId(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user?.id;
-      if (!userId)
-        return res.status(401).json({ message: "Utilisateur non authentifié" });
-
+      const userId = req.user!.id;
       const volunteer = await this.volunteersService.getVolunteerByUserId(
         userId
       );
@@ -44,13 +41,12 @@ export class VolunteersController {
     try {
       const city = req.body.city;
       const skills = req.body.skills;
-      const userId = req.user?.id;
-      if (!userId)
-        return res.status(401).json({ message: "Utilisateur non authentifié" });
-
-      const data = { city, skills, userId };
-
-      const newVolunteer = await this.volunteersService.createVolunteer(data);
+      const userId = req.user!.id;
+      const newVolunteer = await this.volunteersService.createVolunteer({
+        city,
+        skills,
+        userId,
+      });
       res.status(201).json(newVolunteer);
     } catch (err) {
       next(err);
@@ -60,15 +56,12 @@ export class VolunteersController {
   async updateVolunteer(req: Request, res: Response, next: NextFunction) {
     try {
       const { city, skills } = req.body;
-      const userId = req.user?.id;
-      if (!userId)
-        return res.status(401).json({ message: "Utilisateur non authentifié" });
-
-      const volunteer = await this.volunteersService.updateVolunteer(
+      const userId = req.user!.id;
+      const volunteer = await this.volunteersService.updateVolunteer({
         city,
         skills,
-        userId
-      );
+        userId,
+      });
 
       res.status(200).json(volunteer);
     } catch (err) {
@@ -78,12 +71,9 @@ export class VolunteersController {
 
   async deleteVolunteer(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user?.id;
-      if (!userId)
-        return res.status(401).json({ message: "Utilisateur non authentifié" });
-
+      const userId = req.user!.id;
       await this.volunteersService.deleteVolunteerByUserId(userId);
-      res.status(200).json({ message: "Bénévole supprimé" });
+      res.status(204).end();
     } catch (err) {
       next(err);
     }

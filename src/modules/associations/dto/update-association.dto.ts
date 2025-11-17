@@ -1,9 +1,8 @@
 export interface UpdateAssociationDTO {
-  id: string;
-  asso_name?: string;
-  description?: string;
-  website_url?: string;
-  social_link?: string;
-  contact_email?: string;
+  assoName?: string;
+  descr?: string;
+  websiteUrl?: string;
+  socialLink?: string;
+  contactEmail?: string;
   city?: string;
 }

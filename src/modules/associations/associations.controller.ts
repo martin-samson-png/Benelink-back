@@ -28,13 +28,10 @@ export class AssociationsController {
   async createAssociation(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const data = {
+      const association = await this.associationsService.createAssociation({
         userId,
         ...req.body,
-      };
-      const association = await this.associationsService.createAssociation(
-        data
-      );
+      });
       res.status(201).json(association);
     } catch (err) {
       next(err);
@@ -43,9 +40,8 @@ export class AssociationsController {
 
   async updateAssociation(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = req.params.id;
       const userId = req.user!.id;
-      const data = { id, userId, ...req.body };
+      const data = { userId, ...req.body };
       const updated = await this.associationsService.updateAssociation(data);
       res.status(200).json(updated);
     } catch (err) {
@@ -55,7 +51,7 @@ export class AssociationsController {
 
   async deleteAssociation(req: Request, res: Response, next: NextFunction) {
     try {
-      const associationId = req.params.id;
+      const { associationId } = req.body;
       const userId = req.user!.id;
 
       await this.associationsService.deleteAssociation(userId, associationId);

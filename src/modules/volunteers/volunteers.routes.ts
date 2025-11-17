@@ -7,7 +7,7 @@ export const volunteersRoutes = (
 ): Router => {
   const router = Router();
 
-  router.post("/", checkAuth, (req, res, next) =>
+  router.post("/create", checkAuth, (req, res, next) =>
     volunteersController.createVolunteer(req, res, next)
   );
 
@@ -23,7 +23,7 @@ export const volunteersRoutes = (
     volunteersController.getVolunteerById(req, res, next)
   );
 
-  router.put("/", checkAuth, (req, res, next) =>
+  router.patch("/", checkAuth, (req, res, next) =>
     volunteersController.updateVolunteer(req, res, next)
   );
 

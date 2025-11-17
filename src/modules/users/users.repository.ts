@@ -42,7 +42,7 @@ export class UsersRepository {
   async getUserById(id: string): Promise<User | null> {
     const [rows] = await this.pool.query<(UserRow & RowDataPacket)[]>(
       `SELECT u.*, JSON_ARRAYAGG(r.name) AS roles FROM users u JOIN user_roles ur ON u.id = ur.user_id
-       JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
+       JOIN roles r ON ur.role_id = r.id WHERE u.id=?`,
       [id]
     );
     if (rows.length === 0) return null;
@@ -126,7 +126,7 @@ export class UsersRepository {
        JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
       [data.userId]
     );
-    if (rows.length === 0)
+    if (!rows.length)
       throw new InternalServerException(
         "Utilisateur introuvable après modification"
       );
@@ -152,7 +152,7 @@ export class UsersRepository {
        JOIN roles r ON ur.role_id = r.id WHERE u.id=? GROUP BY u.id`,
       [userId]
     );
-    if (rows.length === 0)
+    if (!rows.length)
       throw new InternalServerException(
         "Utilisateur introuvable après modification de l'utilisateur"
       );

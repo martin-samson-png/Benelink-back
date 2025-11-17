@@ -100,8 +100,6 @@ export class UsersService {
     if (Object.keys(fields).length === 0)
       throw new ArgumentRequiredException("Champs obligatoire manquant");
 
-    console.log(userId);
-
     const currentUser = await this.getUserById(userId);
     if (!currentUser) throw new DataNotFoundException("Utilisateur inexistant");
 

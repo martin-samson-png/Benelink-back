@@ -6,6 +6,9 @@ import { CreateVolunteerDTO } from "./dto/create-volunteer.dto";
 import DataNotFoundException from "../../exceptions/data.not.found";
 import ArgumentRequiredException from "../../exceptions/argument.required";
 import DataAlreadyExistException from "../../exceptions/data.already.exists";
+import { Volunteer } from "../../models/volunteer.model";
+import { UpdateVolunteerDTO } from "./dto/update-volunteer.dto";
+import { UpdateVolunteerRepositoryDTO } from "./dto/update-volunteer-repository.dto";
 
 export class VolunteersService {
   constructor(
@@ -14,32 +17,41 @@ export class VolunteersService {
     private readonly skillsService: SkillsService
   ) {}
 
-  async getVolunteerById(volunteerId: string) {
-    if (!volunteerId) throw new ArgumentRequiredException("Id manquante");
+  async getVolunteerById(volunteerId: string): Promise<Volunteer> {
+    if (!volunteerId)
+      throw new ArgumentRequiredException("VolunteerId manquant");
 
-    return await this.volunteersRepository.getVolunteerById(volunteerId);
+    const volunteer = await this.volunteersRepository.getVolunteerById(
+      volunteerId
+    );
+    if (!volunteer) throw new DataNotFoundException("Bénévole introuvable");
+    return volunteer;
   }
 
-  async getVolunteerByUserId(userId: string) {
-    return await this.volunteersRepository.getVolunteerByUserId(userId);
+  async getVolunteerByUserId(userId: string): Promise<Volunteer> {
+    const volunteer = await this.volunteersRepository.getVolunteerByUserId(
+      userId
+    );
+    if (!volunteer) throw new DataNotFoundException("Bénévole introuvable");
+    return volunteer;
   }
 
   async getAllVolunteers() {
     return await this.volunteersRepository.getAllVolunteers();
   }
 
-  async createVolunteer(data: CreateVolunteerDTO) {
+  async createVolunteer(data: CreateVolunteerDTO): Promise<Volunteer> {
     const { city, skills, userId } = data;
 
     if (!city || !skills?.length || !userId)
       throw new ArgumentRequiredException("Champs obligatoires manquants");
 
-    const existingVolunteer = await this.getVolunteerByUserId(userId);
+    const existingVolunteer =
+      await this.volunteersRepository.getVolunteerByUserId(userId);
     if (existingVolunteer)
       throw new DataAlreadyExistException("Bénévole déjà existant");
 
     const roleId = await this.rolesService.getRoleIdByName("volunteer");
-
     if (
       !Array.isArray(skills) ||
       skills.some((skill) => typeof skill !== "string")
@@ -49,7 +61,6 @@ export class VolunteersService {
       );
 
     const skillRows = await this.skillsService.getSkillsIdByNames(skills);
-
     if (!skillRows)
       throw new DataNotFoundException("Aucune compétence valide trouvée");
 
@@ -64,64 +75,70 @@ export class VolunteersService {
       );
 
     const skillsId = skillRows.map((row) => row.id);
-    const volunteerId = crypto.randomUUID();
+    const id = crypto.randomUUID();
 
-    await this.volunteersRepository.createVolunteer({
-      volunteerId,
+    return await this.volunteersRepository.createVolunteer({
+      id,
       userId,
       city,
       skillsId,
       roleId,
     });
-
-    return await this.getVolunteerById(volunteerId);
   }
 
-  async updateVolunteer(city: string, skills: string[], userId: string) {
-    const volunteer = await this.getVolunteerByUserId(userId);
-    if (!volunteer) throw new DataNotFoundException("Bénévole introuvable");
+  async updateVolunteer(data: UpdateVolunteerDTO & { userId: string }) {
+    const { userId, ...fields } = data;
 
-    let skillsId: number[] | null = null;
-    let skillsNames: string[] | null = null;
+    if (!fields.city && !fields.skills)
+      throw new ArgumentRequiredException("Aucun champ valide à mettre à jour");
 
-    if (skills) {
-      if (
-        !Array.isArray(skills) ||
-        skills.some((skill) => typeof skill !== "string")
-      )
-        throw new ArgumentRequiredException(
-          "Toutes les compétences doivent être des chaînes de caractères"
+    const currentVolunteer = await this.getVolunteerByUserId(userId);
+
+    if (!currentVolunteer)
+      throw new DataNotFoundException("Bénévole introuvable");
+
+    const updatePayload: UpdateVolunteerRepositoryDTO = {};
+
+    if (fields.city && fields.city !== currentVolunteer.city)
+      updatePayload.city = fields.city;
+
+    if (fields.skills && fields.skills.length > 0) {
+      const oldNames = [...currentVolunteer.skills].sort();
+      const newNames = [...fields.skills].sort();
+
+      const isSameSkills =
+        oldNames.length == newNames.length &&
+        oldNames.every((name, i) => name === newNames[i]);
+
+      if (!isSameSkills) {
+        const skillRows = await this.skillsService.getSkillsIdByNames(
+          fields.skills
+        );
+        if (!skillRows)
+          throw new DataNotFoundException("Aucune compétence valide trouvée");
+
+        const skillsNames = skillRows.map((r) => r.name);
+
+        const missingSkills = fields.skills.filter(
+          (s) => !skillsNames.includes(s)
         );
 
-      const skillRows = await this.skillsService.getSkillsIdByNames(skills);
-      console.log("skillrows:", skillRows);
-
-      if (!skillRows)
-        throw new DataNotFoundException("Aucune compétence valide trouvée");
-
-      skillsNames = skillRows.map((row) => row.name);
-      console.log("skillsNames:", skillsNames);
-
-      const missingSkills = skills.filter(
-        (skill) => !skillsNames!.includes(skill)
-      );
-      console.log("missingSkills:", missingSkills);
-
-      if (missingSkills.length > 0)
-        throw new DataNotFoundException(
-          `Compétences introuvables : ${missingSkills.join(", ")}`
-        );
-      skillsId = skillRows.map((row) => row.id);
+        if (missingSkills.length > 0)
+          throw new DataNotFoundException(
+            `Compétences introuvables : ${missingSkills.join(", ")}`
+          );
+        updatePayload.skillsId = skillRows.map((row) => row.id);
+      }
     }
-    await this.volunteersRepository.updateVolunteer(
-      volunteer.id,
-      city,
-      skillsId
-    );
-    return { id: volunteer.id, city, skills: skillsNames };
+    if (Object.keys(updatePayload).length === 0)
+      throw new ArgumentRequiredException("Aucun champ à mettre à jour");
+    return await this.volunteersRepository.updateVolunteer({
+      ...updatePayload,
+      volunteerId: currentVolunteer.id,
+    });
   }
 
-  async deleteVolunteerByUserId(userId: string) {
+  async deleteVolunteerByUserId(userId: string): Promise<{ ok: true }> {
     const volunteer = await this.getVolunteerByUserId(userId);
     if (!volunteer) throw new DataNotFoundException("Bénévole introuvable");
 
