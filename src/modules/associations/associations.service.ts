@@ -111,10 +111,50 @@ export class AssociationsService {
     });
   }
 
-  async deleteAssociation(userId: string, associationId: string) {
+  async banAssoMember({
+    userId,
+    banId,
+    associationId,
+  }: {
+    userId: string;
+    banId: string;
+    associationId: string;
+  }): Promise<{ ok: true }> {
+    if (!associationId)
+      throw new ArgumentRequiredException("AssociationId manqant");
+    const association = await this.associationsRepository.getAssociationById(
+      associationId
+    );
+    if (!association)
+      throw new DataNotFoundException("Association introuvable");
+
+    const members = association.members.find((m) => m.user.id === userId);
+    if (!members)
+      throw new ForbiddenException(
+        "Vous ne faites pas partie de l'association"
+      );
+    if (!["owner", "admin_asso"].includes(members.role))
+      throw new ForbiddenException(
+        "Vous n'avez pas les droits pour bannir un utilisateur"
+      );
+    return await this.associationsRepository.banAssoMember({
+      banId,
+      associationId,
+    });
+  }
+
+  async deleteAssociation({
+    userId,
+    associationId,
+  }: {
+    userId: string;
+    associationId: string;
+  }): Promise<{ ok: true }> {
     if (!associationId) throw new ArgumentRequiredException("Id manquante");
 
-    const association = await this.getAssociationById(associationId);
+    const association = await this.associationsRepository.getAssociationById(
+      associationId
+    );
     if (!association)
       throw new DataNotFoundException("Association introuvable");
 
@@ -128,7 +168,9 @@ export class AssociationsService {
         "Vous n'avez pas les droits pour supprimer cette association"
       );
 
-    await this.associationsRepository.deleteAssociation(associationId);
+    const result = await this.associationsRepository.deleteAssociation(
+      associationId
+    );
 
     await Promise.all(
       association.members.map(async (member) => {
@@ -142,5 +184,6 @@ export class AssociationsService {
           );
       })
     );
+    return result;
   }
 }

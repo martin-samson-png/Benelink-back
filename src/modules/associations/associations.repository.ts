@@ -178,16 +178,33 @@ export class AssociationsRepository {
     return associationMapper(rows);
   }
 
-  async deleteAssociation(associationId: string) {
-    try {
-      const [result] = await this.pool.query<ResultSetHeader>(
-        `DELETE FROM associations WHERE id=?`,
-        [associationId]
+  async banAssoMember({
+    banId,
+    associationId,
+  }: {
+    banId: string;
+    associationId: string;
+  }): Promise<{ ok: true }> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `DELETE FROM association_members WHERE user_id=? AND association_id=?`,
+      [banId, associationId]
+    );
+    if (result.affectedRows === 0)
+      throw new InternalServerException(
+        "Erreur lors de la suppression du membres"
       );
-      return result;
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
+    return { ok: true };
+  }
+
+  async deleteAssociation(associationId: string): Promise<{ ok: true }> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `DELETE FROM associations WHERE id=?`,
+      [associationId]
+    );
+    if (result.affectedRows === 0)
+      throw new InternalServerException(
+        "Erreur lors de la suppression de l'association"
+      );
+    return { ok: true };
   }
 }
